@@ -3,12 +3,6 @@ import Letter, { ILetter } from '@/models/Letter';
 import User from '@/models/User';
 import { SendLetterInput } from '@/lib/validation';
 import { addMinutes } from 'date-fns';
-import { marked } from 'marked';
-import createDOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
-
-const window = new JSDOM('').window;
-const DOMPurify = createDOMPurify(window as any);
 
 export class LetterService {
   static async sendLetter(data: SendLetterInput): Promise<ILetter> {
@@ -47,21 +41,16 @@ export class LetterService {
     const deliveryDelayMinutes = 2; 
     const availableAt = addMinutes(new Date(), deliveryDelayMinutes);
 
-    // 5. Sanitize Content
-    // Convert Markdown to HTML then sanitize
-    const rawHtml = await marked.parse(data.content);
-    const sanitizedHtml = DOMPurify.sanitize(rawHtml);
-
-    // 6. Create Letter
+    // 5. Create Letter
     const newLetter = new Letter({
       sender_id: data.sender_id,
       receiver_address: data.receiver_address,
-      content_raw: data.content,
-      content_rendered: sanitizedHtml,
+      content: data.content,
       status: 'sending',
       sent_at: new Date(),
       available_at: availableAt,
       images: data.images || [],
+      stamp_id: data.stamp_id,
     });
 
     return await newLetter.save();

@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Feather } from 'lucide-react';
 import Onboarding from '@/components/Onboarding';
 import Desk from '@/components/Desk';
-import VideoBackground from '@/components/VideoBackground';
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -44,10 +43,7 @@ export default function Home() {
   if (!mounted) return null;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 relative overflow-hidden">
-      {/* Cinematic Video Background */}
-      <VideoBackground />
-
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 relative overflow-hidden bg-gradient-to-b from-[#81d4fa] to-[#4fc3f7]">
       <AnimatePresence mode="wait">
         {!hasEntered ? (
           <motion.div

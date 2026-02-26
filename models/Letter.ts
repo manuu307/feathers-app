@@ -3,20 +3,19 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface ILetter extends Document {
   sender_id: mongoose.Types.ObjectId;
   receiver_address: string;
-  content_raw: string;
-  content_rendered: string;
+  content: string;
   status: 'sending' | 'received';
   sent_at: Date;
   available_at: Date;
   received_at?: Date;
   images: string[];
+  stamp_id?: string;
 }
 
 const LetterSchema = new Schema<ILetter>({
   sender_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   receiver_address: { type: String, required: true },
-  content_raw: { type: String, required: true },
-  content_rendered: { type: String, required: true }, // Sanitized HTML
+  content: { type: String, required: true },
   status: { 
     type: String, 
     enum: ['sending', 'received'], 
@@ -30,6 +29,7 @@ const LetterSchema = new Schema<ILetter>({
     type: [String], 
     validate: [arrayLimit, '{PATH} exceeds the limit of 3'] 
   },
+  stamp_id: { type: String },
 });
 
 function arrayLimit(val: string[]) {
@@ -42,6 +42,7 @@ LetterSchema.index({ sender_id: 1 });
 LetterSchema.index({ available_at: 1 });
 
 // Prevent recompilation of model in development
+// Check if model exists before compiling
 const Letter: Model<ILetter> = mongoose.models.Letter || mongoose.model<ILetter>('Letter', LetterSchema);
 
 export default Letter;

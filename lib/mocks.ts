@@ -23,8 +23,7 @@ export const MOCK_LETTERS = [
     _id: 'letter-mock-1',
     sender_address: 'mystic-vale',
     receiver_address: 'elder-thorne',
-    content_raw: 'The stars align over the Great Oak. The ritual begins at midnight. Bring the silver chalice.',
-    content_rendered: '<p>The stars align over the Great Oak. The ritual begins at midnight. Bring the silver chalice.</p>',
+    content: 'The stars align over the Great Oak. The ritual begins at midnight. Bring the silver chalice.',
     available_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
     created_at: new Date(Date.now() - 172800000).toISOString(),
     stamp: MOCK_STAMPS[0],
@@ -33,8 +32,7 @@ export const MOCK_LETTERS = [
     _id: 'letter-mock-2',
     sender_address: 'iron-forge',
     receiver_address: 'elder-thorne',
-    content_raw: 'The shipment of dragon-glass has arrived. Prepare the forges. We strike at dawn.',
-    content_rendered: '<p>The shipment of dragon-glass has arrived. Prepare the forges. We strike at dawn.</p>',
+    content: 'The shipment of dragon-glass has arrived. Prepare the forges. We strike at dawn.',
     available_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
     created_at: new Date(Date.now() - 7200000).toISOString(),
     stamp: MOCK_STAMPS[2],
@@ -43,8 +41,7 @@ export const MOCK_LETTERS = [
     _id: 'letter-mock-3',
     sender_address: 'silver-stream',
     receiver_address: 'elder-thorne',
-    content_raw: 'The river whispers of a coming storm. Secure the scrolls in the high tower.',
-    content_rendered: '<p>The river whispers of a coming storm. Secure the scrolls in the high tower.</p>',
+    content: 'The river whispers of a coming storm. Secure the scrolls in the high tower.',
     available_at: new Date(Date.now() - 10000).toISOString(), // 10 seconds ago
     created_at: new Date(Date.now() - 120000).toISOString(),
     stamp: null,
