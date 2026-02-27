@@ -17,6 +17,11 @@ export interface IUser extends Document {
   birth_date: Date;
   addresses: IAddress[];
   bird: IBird;
+  gold: number;
+  stamps: {
+    stamp_id: string;
+    quantity: number;
+  }[];
   created_at: Date;
 }
 
@@ -41,6 +46,11 @@ const UserSchema = new Schema<IUser>({
   birth_date: { type: Date, required: true },
   addresses: { type: [AddressSchema], default: [] },
   bird: { type: BirdSchema, required: true },
+  gold: { type: Number, default: 100 }, // Starting gold
+  stamps: [{
+    stamp_id: { type: String, required: true },
+    quantity: { type: Number, default: 1 }
+  }],
   created_at: { type: Date, default: Date.now },
 });
 

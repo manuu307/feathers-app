@@ -49,7 +49,17 @@ export class LetterService {
       }
     }
 
-    // 5. Create Letter
+    // 5. Deduct Stamp from Inventory
+    if (data.stamp_id) {
+      const stampIndex = sender.stamps.findIndex(s => s.stamp_id === data.stamp_id);
+      if (stampIndex === -1 || sender.stamps[stampIndex].quantity <= 0) {
+        throw new Error('You do not have any of this stamp in your inventory.');
+      }
+      sender.stamps[stampIndex].quantity -= 1;
+      await sender.save();
+    }
+
+    // 6. Create Letter
     const newLetter = new Letter({
       sender_id: data.sender_id,
       receiver_address: data.receiver_address,

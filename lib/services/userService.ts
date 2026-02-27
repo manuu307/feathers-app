@@ -1,10 +1,15 @@
 import dbConnect from '@/lib/db';
 import User, { IUser } from '@/models/User';
 import { CreateUserInput } from '@/lib/validation';
+import { StampService } from './stampService';
 
 export class UserService {
   static async createUser(data: CreateUserInput): Promise<IUser> {
     await dbConnect();
+
+    // Ensure stamps are seeded
+    await StampService.seedDefaultStamps();
+    const defaultStamps = await (await import('@/models/Stamp')).default.find({ is_default: true });
 
     // Check if address already exists
     const existingUser = await User.findOne({ 'addresses.address': data.address });
@@ -21,6 +26,8 @@ export class UserService {
         type: data.bird_type,
         colors: ['#d4af37'], // Default gold accent
       },
+      gold: 100,
+      stamps: defaultStamps.map(s => ({ stamp_id: s._id.toString(), quantity: 3 })),
     });
 
     return await newUser.save();

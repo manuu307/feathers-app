@@ -1,6 +1,6 @@
 'use client';
 
-import { Feather, PenTool, Search, RefreshCw, User, LogOut, Globe, StickyNote, Volume2, VolumeX, SendHorizontal } from 'lucide-react';
+import { Feather, PenTool, Search, RefreshCw, User, LogOut, Globe, StickyNote, Volume2, VolumeX, SendHorizontal, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage, Language } from '@/lib/i18n';
 import { useSound } from '@/lib/sounds';
@@ -27,6 +27,7 @@ export default function Navigation({ currentView, onViewChange, onRefresh, onLog
     { id: 'list', icon: Feather, label: t.nav.home },
     { id: 'writing', icon: PenTool, label: t.nav.write },
     { id: 'sent', icon: SendHorizontal, label: t.nav.sent },
+    { id: 'market', icon: ShoppingBag, label: t.nav.market },
     { id: 'search', icon: Search, label: t.nav.seek },
     { id: 'notes', icon: StickyNote, label: t.nav.notes },
     { id: 'profile', icon: User, label: t.nav.profile },

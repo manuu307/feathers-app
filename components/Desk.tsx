@@ -17,6 +17,7 @@ import SearchView from '@/components/SearchView';
 import NotesManager from '@/components/NotesManager';
 import DraftsManager from '@/components/DraftsManager';
 import LetterSkeleton from '@/components/LetterSkeleton';
+import StampMarket from '@/components/StampMarket';
 import { useLanguage } from '@/lib/i18n';
 import { useSound } from '@/lib/sounds';
 import { Eraser } from 'lucide-react';
@@ -33,7 +34,23 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const [view, setView] = useState('list'); // list, writing, reading, search, profile, notes
   const [letters, setLetters] = useState<any[]>([]);
   const [isLettersLoading, setIsLettersLoading] = useState(true);
+  const [allStamps, setAllStamps] = useState<any[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
+
+  useEffect(() => {
+    const fetchAllStamps = async () => {
+      try {
+        const response = await fetch('/api/stamps');
+        if (response.ok) {
+          const data = await response.json();
+          setAllStamps(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stamps', error);
+      }
+    };
+    fetchAllStamps();
+  }, []);
   const [currentPage, setCurrentPage] = useState(0);
   const [writingPages, setWritingPages] = useState<string[]>(['']);
   const [currentWritingPage, setCurrentWritingPage] = useState(0);
@@ -426,15 +443,19 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                             </div>
                           </div>
                           
-                          {letter.stamp && (
-                            <div className="transform rotate-3 group-hover:rotate-6 transition-transform">
-                              <Stamp 
-                                icon={letter.stamp.icon} 
-                                color={letter.stamp.color} 
-                                size="sm" 
-                              />
-                            </div>
-                          )}
+                          {(() => {
+                            const stamp = allStamps.find(s => (s._id || s.id) === letter.stamp_id);
+                            if (!stamp) return null;
+                            return (
+                              <div className="transform rotate-3 group-hover:rotate-6 transition-transform">
+                                <Stamp 
+                                  icon={stamp.icon} 
+                                  color={stamp.color} 
+                                  size="sm" 
+                                />
+                              </div>
+                            );
+                          })()}
                         </div>
                         
                         <p className="text-celtic-wood-main text-lg font-serif italic line-clamp-2 border-l-2 border-celtic-gold/30 pl-4">
@@ -617,20 +638,28 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                   <div className="w-full md:w-48 flex flex-col items-center space-y-6 p-6 bg-white/30 rounded-sm border border-celtic-wood-light/10">
                     <label className="text-[10px] uppercase tracking-[0.2em] text-celtic-wood-light font-display">{t.writing.selectSeal}</label>
                     <div className="grid grid-cols-2 md:grid-cols-1 gap-4">
-                      {MOCK_STAMPS.filter(s => user.stamps?.includes(s.id)).map((stamp) => (
-                        <button
-                          key={stamp.id}
-                          type="button"
-                          onClick={() => {
-                            playSound('stamp');
-                            setValue('stamp_id', currentStampId === stamp.id ? undefined : stamp.id);
-                          }}
-                          className={`p-2 rounded-sm transition-all flex justify-center ${currentStampId === stamp.id ? 'bg-celtic-gold/20 ring-2 ring-celtic-gold' : 'hover:bg-celtic-wood-dark/5'}`}
-                        >
-                          <Stamp icon={stamp.icon} color={stamp.color} size="md" />
-                        </button>
-                      ))}
-                      {(!user.stamps || user.stamps.length === 0) && (
+                      {user.stamps?.filter((s: any) => s.quantity > 0).map((inventoryItem: any) => {
+                        const stamp = allStamps.find(s => (s._id || s.id) === inventoryItem.stamp_id);
+                        if (!stamp) return null;
+                        
+                        const stampId = stamp._id || stamp.id;
+
+                        return (
+                          <button
+                            key={stampId}
+                            type="button"
+                            onClick={() => {
+                              playSound('stamp');
+                              setValue('stamp_id', currentStampId === stampId ? undefined : stampId);
+                            }}
+                            className={`p-2 rounded-sm transition-all flex flex-col items-center justify-center relative ${currentStampId === stampId ? 'bg-celtic-gold/20 ring-2 ring-celtic-gold' : 'hover:bg-celtic-wood-dark/5'}`}
+                          >
+                            <Stamp icon={stamp.icon} color={stamp.color} size="md" />
+                            <span className="text-[8px] mt-1 text-celtic-wood-light font-display">x{inventoryItem.quantity}</span>
+                          </button>
+                        );
+                      })}
+                      {(!user.stamps || user.stamps.filter((s: any) => s.quantity > 0).length === 0) && (
                         <div className="col-span-2 md:col-span-1 h-20 border-2 border-dashed border-celtic-wood-light/20 rounded-sm flex items-center justify-center">
                           <span className="text-[10px] text-celtic-wood-light/40 text-center px-2">{t.writing.noStamps}</span>
                         </div>
@@ -697,15 +726,19 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                     {mounted ? new Date(selectedLetter.available_at).toLocaleDateString() : '...'}
                   </p>
                   
-                  {selectedLetter.stamp && (
-                    <div className="absolute top-0 right-0 transform rotate-12 drop-shadow-md">
-                      <Stamp 
-                        icon={selectedLetter.stamp.icon} 
-                        color={selectedLetter.stamp.color} 
-                        size="lg" 
-                      />
-                    </div>
-                  )}
+                  {(() => {
+                    const stamp = allStamps.find(s => (s._id || s.id) === selectedLetter.stamp_id);
+                    if (!stamp) return null;
+                    return (
+                      <div className="absolute top-0 right-0 transform rotate-12 drop-shadow-md">
+                        <Stamp 
+                          icon={stamp.icon} 
+                          color={stamp.color} 
+                          size="lg" 
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex-grow prose prose-p:font-serif prose-headings:font-display prose-p:text-celtic-wood-dark prose-headings:text-celtic-wood-dark max-w-none">
@@ -855,6 +888,19 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
           {/* SEARCH VIEW */}
           {view === 'search' && (
             <SearchView onSelectUser={handleSelectUser} />
+          )}
+
+          {/* MARKET VIEW */}
+          {view === 'market' && (
+            <motion.div
+              key="market"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full max-w-4xl"
+            >
+              <StampMarket user={user} onUpdateUser={handleUpdateUser} />
+            </motion.div>
           )}
 
           {/* NOTES VIEW */}

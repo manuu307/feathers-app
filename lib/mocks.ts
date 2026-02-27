@@ -1,8 +1,10 @@
 export const MOCK_STAMPS = [
-  { id: 'stamp-forest', name: 'Ancient Oak', color: '#2e7d32', icon: 'Tree' },
-  { id: 'stamp-sky', name: 'Cloud Peak', color: '#81d4fa', icon: 'Cloud' },
-  { id: 'stamp-sun', name: 'Golden Sol', color: '#fbc02d', icon: 'Sun' },
-  { id: 'stamp-moon', name: 'Silver Crescent', color: '#9e9e9e', icon: 'Moon' },
+  { id: 'stamp-forest', name: 'Ancient Oak', color: '#2e7d32', icon: 'Tree', price: 0, is_default: true },
+  { id: 'stamp-sky', name: 'Cloud Peak', color: '#81d4fa', icon: 'Cloud', price: 0, is_default: true },
+  { id: 'stamp-sun', name: 'Golden Sol', color: '#fbc02d', icon: 'Sun', price: 0, is_default: true },
+  { id: 'stamp-moon', name: 'Silver Crescent', color: '#9e9e9e', icon: 'Moon', price: 50, is_default: false },
+  { id: 'stamp-fire', name: 'Eternal Flame', color: '#f44336', icon: 'Flame', price: 75, is_default: false },
+  { id: 'stamp-water', name: 'Deep Blue', color: '#2196f3', icon: 'Waves', price: 60, is_default: false },
 ];
 
 export const MOCK_USER = {
@@ -14,7 +16,12 @@ export const MOCK_USER = {
     name: 'Archimedes',
     type: 'owl',
   },
-  stamps: ['stamp-forest', 'stamp-sky'],
+  gold: 250,
+  stamps: [
+    { stamp_id: 'stamp-forest', quantity: 5 },
+    { stamp_id: 'stamp-sky', quantity: 3 },
+    { stamp_id: 'stamp-sun', quantity: 10 },
+  ],
   created_at: new Date().toISOString(),
 };
 
