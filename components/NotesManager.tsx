@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, X, Trash2, Save, StickyNote } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
+import { useSound } from '@/lib/sounds';
 
 interface Note {
   _id: string;
@@ -27,12 +28,18 @@ const COLORS = [
 
 export default function NotesManager({ userId, mode = 'full', onClose }: NotesManagerProps) {
   const { t } = useLanguage();
+  const { playSound } = useSound();
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNoteColor, setNewNoteColor] = useState('yellow');
   const [isCreating, setIsCreating] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setMounted(true), 0);
+  }, []);
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -54,6 +61,7 @@ export default function NotesManager({ userId, mode = 'full', onClose }: NotesMa
 
   const handleCreateNote = async () => {
     if (!newNoteContent.trim()) return;
+    playSound('click');
 
     try {
       const response = await fetch('/api/notes', {
@@ -78,6 +86,7 @@ export default function NotesManager({ userId, mode = 'full', onClose }: NotesMa
   };
 
   const handleDeleteNote = async (id: string) => {
+    playSound('click');
     try {
       const response = await fetch(`/api/notes/${id}`, {
         method: 'DELETE',
@@ -92,6 +101,7 @@ export default function NotesManager({ userId, mode = 'full', onClose }: NotesMa
   };
 
   const handleUpdateNote = async (note: Note) => {
+    playSound('click');
     try {
       const response = await fetch(`/api/notes/${note._id}`, {
         method: 'PUT',
@@ -246,7 +256,7 @@ export default function NotesManager({ userId, mode = 'full', onClose }: NotesMa
                     </div>
                     <div className="absolute bottom-2 right-3">
                         <span className="text-[10px] text-celtic-wood-dark/40 font-display uppercase tracking-wider">
-                            {new Date(note.created_at).toLocaleDateString()}
+                            {mounted ? new Date(note.created_at).toLocaleDateString() : '...'}
                         </span>
                     </div>
                   </>

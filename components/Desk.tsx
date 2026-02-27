@@ -16,7 +16,9 @@ import ProfileView from '@/components/ProfileView';
 import SearchView from '@/components/SearchView';
 import NotesManager from '@/components/NotesManager';
 import DraftsManager from '@/components/DraftsManager';
+import LetterSkeleton from '@/components/LetterSkeleton';
 import { useLanguage } from '@/lib/i18n';
+import { useSound } from '@/lib/sounds';
 import { Eraser } from 'lucide-react';
 
 interface DeskProps {
@@ -26,9 +28,11 @@ interface DeskProps {
 
 export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const { t } = useLanguage();
+  const { playSound } = useSound();
   const [user, setUser] = useState(initialUser);
   const [view, setView] = useState('list'); // list, writing, reading, search, profile, notes
   const [letters, setLetters] = useState<any[]>([]);
+  const [isLettersLoading, setIsLettersLoading] = useState(true);
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [writingPages, setWritingPages] = useState<string[]>(['']);
@@ -38,9 +42,14 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [birdState, setBirdState] = useState<'idle' | 'flying' | 'landing'>('idle');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setMounted(true), 0);
+  }, []);
 
   // Tagging & Saving State
-  const [mailboxTab, setMailboxTab] = useState<'inbox' | 'saved'>('inbox');
+  const [mailboxTab, setMailboxTab] = useState<'inbox' | 'saved' | 'sent'>('inbox');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [readingTags, setReadingTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
@@ -69,28 +78,52 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
 
   const currentStampId = watch('stamp_id');
 
-  const fetchLetters = useCallback(async () => {
+  const fetchLetters = useCallback(async (showLoading = false) => {
+    if (!user?.addresses?.[0]?.address) {
+      console.warn('No user address found, skipping fetch');
+      setIsLettersLoading(false);
+      return;
+    }
+
+    if (showLoading) setIsLettersLoading(true);
     try {
       const address = user.addresses[0].address;
-      const typeParam = mailboxTab === 'saved' ? '?type=saved' : '';
-      const response = await fetch(`/api/letters/${address}${typeParam}`);
+      let url = `/api/letters/${address}`;
+      const params = new URLSearchParams();
+      
+      if (mailboxTab === 'saved') params.append('type', 'saved');
+      if (mailboxTab === 'sent') {
+        params.append('type', 'sent');
+        params.append('userId', user._id);
+      }
+      
+      const queryString = params.toString();
+      const response = await fetch(queryString ? `${url}?${queryString}` : url);
+      
       if (response.ok) {
         const data = await response.json();
         setLetters(data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error fetching letters:', response.status, errorData);
       }
     } catch (error) {
-      console.error('Failed to fetch letters', error);
+      console.error('Network Error fetching letters:', error);
+    } finally {
+      setIsLettersLoading(false);
     }
   }, [user, mailboxTab]);
 
   useEffect(() => {
-    fetchLetters();
-    const interval = setInterval(fetchLetters, 30000); // Poll every 30s
+    setLetters([]); 
+    fetchLetters(true);
+    const interval = setInterval(() => fetchLetters(false), 30000); // Poll every 30s silently
     return () => clearInterval(interval);
   }, [fetchLetters]);
 
   const handleCloseLetter = async (action: 'save' | 'drop') => {
     if (!selectedLetter) return;
+    playSound('click');
 
     try {
       const response = await fetch('/api/letters/status', {
@@ -126,6 +159,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
         content: fullContent,
         receiver_address: watch('receiver_address'),
         stamp_id: watch('stamp_id'),
+        scheduled_at: watch('scheduled_at'),
       };
       
       if (!currentDraftId) {
@@ -171,6 +205,16 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
          reset();
       }
     }
+    if (newView === 'sent') {
+      setMailboxTab('sent');
+      setView('list');
+      setSelectedTag(null);
+      return;
+    }
+    if (newView === 'list') {
+      setMailboxTab('inbox');
+      setSelectedTag(null);
+    }
     setView(newView);
     if (newView !== 'reading') setSelectedLetter(null);
     if (newView === 'writing') {
@@ -182,9 +226,11 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   };
 
   const handleSelectDraft = (draft: any) => {
+    playSound('paper');
     setWritingPages(draft.content.split(PAGE_DELIMITER));
     setValue('receiver_address', draft.receiver_address || '');
     setValue('stamp_id', draft.stamp_id);
+    setValue('scheduled_at', draft.scheduled_at ? new Date(draft.scheduled_at).toISOString().slice(0, 16) : '');
     setCurrentDraftId(draft._id);
     setShowDraftsSidebar(false);
     setView('writing');
@@ -193,6 +239,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const onSend = async (data: SendLetterInput) => {
     setIsSending(true);
     setSendError(null);
+    playSound('bird');
     try {
       const response = await fetch('/api/letters/send', {
         method: 'POST',
@@ -206,12 +253,12 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
         throw new Error(result.error || 'Failed to send letter');
       }
 
-      // Delete draft if it exists
       if (currentDraftId) {
         await fetch(`/api/drafts/${currentDraftId}`, { method: 'DELETE' });
         setCurrentDraftId(null);
       }
 
+      playSound('success');
       // Success animation/state
       setView('list');
       reset();
@@ -245,7 +292,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
       <Navigation 
         currentView={view} 
         onViewChange={handleViewChange}
-        onRefresh={fetchLetters}
+        onRefresh={() => fetchLetters(true)}
         onLogout={onLogout}
       />
 
@@ -280,6 +327,12 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                 >
                   {t.mailbox.saved}
                 </button>
+                <button
+                  onClick={() => { setMailboxTab('sent'); setSelectedTag(null); }}
+                  className={`text-lg font-display tracking-widest uppercase transition-colors ${mailboxTab === 'sent' ? 'text-celtic-gold border-b-2 border-celtic-gold' : 'text-white/60 hover:text-white'}`}
+                >
+                  {t.mailbox.sent}
+                </button>
               </div>
 
               {/* Tag Filters (Only in Saved) */}
@@ -304,6 +357,16 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
               )}
 
               {(() => {
+                if (isLettersLoading) {
+                  return (
+                    <div className="space-y-6">
+                      {[1, 2, 3].map((i) => (
+                        <LetterSkeleton key={i} />
+                      ))}
+                    </div>
+                  );
+                }
+
                 const displayedLetters = selectedTag 
                   ? letters.filter(l => l.tags?.includes(selectedTag))
                   : letters;
@@ -312,7 +375,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                   return (
                     <div className="parchment-card p-12 text-center rounded-sm">
                       <p className="text-celtic-wood-light font-serif italic text-xl">
-                        {mailboxTab === 'saved' ? t.mailbox.noSaved : t.mailbox.empty}
+                        {mailboxTab === 'sent' ? t.mailbox.noSent : (mailboxTab === 'saved' ? t.mailbox.noSaved : t.mailbox.empty)}
                       </p>
                       {mailboxTab === 'inbox' && (
                         <button 
@@ -334,6 +397,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         onClick={() => {
+                          playSound('paper');
                           setSelectedLetter(letter);
                           setCurrentPage(0);
                           setReadingTags(letter.tags || []);
@@ -350,9 +414,14 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                               <Mail className="w-5 h-5 text-celtic-wood-dark" />
                             </div>
                             <div>
-                              <span className="block text-celtic-wood-dark font-display text-sm tracking-wider uppercase">{t.mailbox.fromBeyond}</span>
+                              <span className="block text-celtic-wood-dark font-display text-sm tracking-wider uppercase">
+                                {mailboxTab === 'sent' 
+                                  ? t.mailbox.toRecipient.replace('{address}', letter.receiver_address) 
+                                  : t.mailbox.fromBeyond
+                                }
+                              </span>
                               <span className="text-celtic-wood-light text-xs font-serif italic">
-                                {new Date(letter.available_at).toLocaleDateString()}
+                                {mounted ? new Date(mailboxTab === 'sent' ? letter.sent_at : letter.available_at).toLocaleDateString() : '...'}
                               </span>
                             </div>
                           </div>
@@ -449,6 +518,16 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                       {errors.receiver_address && <p className="text-red-700 text-xs mt-2 font-serif">{errors.receiver_address.message}</p>}
                     </div>
 
+                    <div className="relative mb-10">
+                      <label className="block text-xs uppercase tracking-[0.2em] text-celtic-wood-light mb-3 font-display">{t.writing.schedule}</label>
+                      <input
+                        type="datetime-local"
+                        {...register('scheduled_at')}
+                        className="w-full bg-transparent border-b-2 border-celtic-wood-light/30 py-3 text-celtic-wood-dark font-serif text-xl focus:border-celtic-gold focus:outline-none transition-colors"
+                      />
+                      {errors.scheduled_at && <p className="text-red-700 text-xs mt-2 font-serif">{errors.scheduled_at.message}</p>}
+                    </div>
+
                     <div className="relative flex-grow flex flex-col">
                       <textarea
                         value={writingPages[currentWritingPage]}
@@ -472,7 +551,10 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                         <button
                           type="button"
                           disabled={currentWritingPage === 0}
-                          onClick={() => setCurrentWritingPage(prev => prev - 1)}
+                          onClick={() => {
+                            playSound('paper');
+                            setCurrentWritingPage(prev => prev - 1);
+                          }}
                           className="p-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors"
                         >
                           <ChevronLeft className="w-5 h-5" />
@@ -485,7 +567,10 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                         <button
                           type="button"
                           disabled={currentWritingPage === writingPages.length - 1}
-                          onClick={() => setCurrentWritingPage(prev => prev + 1)}
+                          onClick={() => {
+                            playSound('paper');
+                            setCurrentWritingPage(prev => prev + 1);
+                          }}
                           className="p-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors"
                         >
                           <ChevronRight className="w-5 h-5" />
@@ -536,7 +621,10 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                         <button
                           key={stamp.id}
                           type="button"
-                          onClick={() => setValue('stamp_id', currentStampId === stamp.id ? undefined : stamp.id)}
+                          onClick={() => {
+                            playSound('stamp');
+                            setValue('stamp_id', currentStampId === stamp.id ? undefined : stamp.id);
+                          }}
                           className={`p-2 rounded-sm transition-all flex justify-center ${currentStampId === stamp.id ? 'bg-celtic-gold/20 ring-2 ring-celtic-gold' : 'hover:bg-celtic-wood-dark/5'}`}
                         >
                           <Stamp icon={stamp.icon} color={stamp.color} size="md" />
@@ -605,7 +693,9 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
 
                 <div className="mb-12 text-center border-b border-celtic-wood-light/20 pb-8 relative">
                   <p className="font-display text-xs text-celtic-wood-light uppercase tracking-[0.3em] mb-3">{t.reading.received}</p>
-                  <p className="font-serif text-2xl italic text-celtic-wood-dark">{new Date(selectedLetter.available_at).toLocaleDateString()}</p>
+                  <p className="font-serif text-2xl italic text-celtic-wood-dark">
+                    {mounted ? new Date(selectedLetter.available_at).toLocaleDateString() : '...'}
+                  </p>
                   
                   {selectedLetter.stamp && (
                     <div className="absolute top-0 right-0 transform rotate-12 drop-shadow-md">
@@ -629,7 +719,10 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                   <div className="mt-8 flex items-center justify-between border-t border-celtic-wood-light/10 pt-6">
                     <button
                       disabled={currentPage === 0}
-                      onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                      onClick={() => {
+                        playSound('paper');
+                        setCurrentPage(prev => Math.max(0, prev - 1));
+                      }}
                       className="flex items-center space-x-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors uppercase font-display text-[10px] tracking-widest"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -642,7 +735,10 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
 
                     <button
                       disabled={currentPage === totalPages - 1}
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                      onClick={() => {
+                        playSound('paper');
+                        setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+                      }}
                       className="flex items-center space-x-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors uppercase font-display text-[10px] tracking-widest"
                     >
                       <span>{t.reading.next}</span>

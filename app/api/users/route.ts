@@ -4,6 +4,8 @@ import { CreateUserSchema } from '@/lib/validation';
 import { ZodError } from 'zod';
 import { MOCK_USER } from '@/lib/mocks';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

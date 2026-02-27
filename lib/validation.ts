@@ -16,6 +16,7 @@ export const SendLetterSchema = z.object({
   content: z.string().min(50, "Letter must be at least 50 characters long").max(5000, "Letter cannot exceed 5000 characters"),
   images: z.array(z.string().url()).max(3, "Maximum 3 images allowed").optional(),
   stamp_id: z.string().optional(),
+  scheduled_at: z.string().optional().refine((date) => !date || new Date(date).toString() !== 'Invalid Date', { message: "Valid date is required" }),
 });
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;

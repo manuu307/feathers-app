@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Trash2, Edit3, Clock } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
+import { useSound } from '@/lib/sounds';
 
 interface Draft {
   _id: string;
   content: string;
   receiver_address?: string;
   stamp_id?: string;
+  scheduled_at?: string;
   updated_at: string;
 }
 
@@ -21,8 +23,14 @@ interface DraftsManagerProps {
 
 export default function DraftsManager({ userId, onSelectDraft, onClose }: DraftsManagerProps) {
   const { t } = useLanguage();
+  const { playSound } = useSound();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setMounted(true), 0);
+  }, []);
 
   const fetchDrafts = useCallback(async () => {
     try {
@@ -44,6 +52,7 @@ export default function DraftsManager({ userId, onSelectDraft, onClose }: Drafts
 
   const handleDeleteDraft = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    playSound('click');
     if (!window.confirm(t.drafts.discard + '?')) return;
 
     try {
@@ -94,14 +103,22 @@ export default function DraftsManager({ userId, onSelectDraft, onClose }: Drafts
                     {draft.content.replace(/\f/g, ' ')}
                   </p>
                   
-                  <div className="flex items-center gap-4 text-[10px] text-celtic-wood-light uppercase tracking-wider">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {new Date(draft.updated_at).toLocaleDateString()}
-                    </span>
-                    {draft.receiver_address && (
-                      <span className="truncate max-w-[100px]">
-                        To: {draft.receiver_address}
+                  <div className="flex flex-col gap-1 text-[10px] text-celtic-wood-light uppercase tracking-wider">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {mounted ? new Date(draft.updated_at).toLocaleDateString() : '...'}
+                      </span>
+                      {draft.receiver_address && (
+                        <span className="truncate max-w-[100px]">
+                          To: {draft.receiver_address}
+                        </span>
+                      )}
+                    </div>
+                    {draft.scheduled_at && (
+                      <span className="text-celtic-gold flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Scheduled: {mounted ? new Date(draft.scheduled_at).toLocaleString() : '...'}
                       </span>
                     )}
                   </div>

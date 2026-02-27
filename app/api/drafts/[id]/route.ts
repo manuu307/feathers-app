@@ -6,11 +6,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     await dbConnect();
     const { id } = await params;
-    const { content, receiver_address, stamp_id } = await req.json();
+    const { content, receiver_address, stamp_id, scheduled_at } = await req.json();
 
     const updatedDraft = await Draft.findByIdAndUpdate(
       id,
-      { content, receiver_address, stamp_id, updated_at: new Date() },
+      { content, receiver_address, stamp_id, scheduled_at, updated_at: new Date() },
       { new: true }
     );
 

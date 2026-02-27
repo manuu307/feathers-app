@@ -39,7 +39,15 @@ export class LetterService {
     // For prototype: 2-5 minutes. For prod: 6-24 hours.
     // Let's make it 2 minutes for the preview to be testable, but architecture supports hours.
     const deliveryDelayMinutes = 2; 
-    const availableAt = addMinutes(new Date(), deliveryDelayMinutes);
+    let availableAt = addMinutes(new Date(), deliveryDelayMinutes);
+
+    if (data.scheduled_at) {
+      const scheduledDate = new Date(data.scheduled_at);
+      // Ensure scheduled date is at least the delivery delay from now
+      if (scheduledDate > availableAt) {
+        availableAt = scheduledDate;
+      }
+    }
 
     // 5. Create Letter
     const newLetter = new Letter({
@@ -51,6 +59,7 @@ export class LetterService {
       available_at: availableAt,
       images: data.images || [],
       stamp_id: data.stamp_id,
+      scheduled_at: data.scheduled_at ? new Date(data.scheduled_at) : undefined,
     });
 
     return await newLetter.save();
@@ -94,5 +103,12 @@ export class LetterService {
       receiver_address: address,
       available_at: { $gt: now },
     }).sort({ available_at: 1 });
+  }
+
+  static async getSentLetters(userId: string): Promise<ILetter[]> {
+    await dbConnect();
+    return await Letter.find({
+      sender_id: userId
+    }).sort({ sent_at: -1 });
   }
 }

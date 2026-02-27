@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${cinzel.variable} ${ebGaramond.variable} ${pinyonScript.variable}`}>
+    <html lang="en" className={`${cinzel.variable} ${ebGaramond.variable} ${pinyonScript.variable}`} suppressHydrationWarning>
       <body className="bg-feathers-bg text-feathers-text min-h-screen antialiased selection:bg-feathers-accent selection:text-feathers-bg overflow-x-hidden">
         <Providers>
           {children}

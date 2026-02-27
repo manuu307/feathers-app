@@ -11,6 +11,7 @@ export interface ILetter extends Document {
   images: string[];
   stamp_id?: string;
   tags: string[];
+  scheduled_at?: Date;
 }
 
 const LetterSchema = new Schema<ILetter>({
@@ -32,6 +33,7 @@ const LetterSchema = new Schema<ILetter>({
   },
   stamp_id: { type: String },
   tags: { type: [String], default: [] },
+  scheduled_at: { type: Date },
 });
 
 function arrayLimit(val: string[]) {

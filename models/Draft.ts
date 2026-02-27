@@ -5,6 +5,7 @@ export interface IDraft extends Document {
   content: string;
   receiver_address?: string;
   stamp_id?: string;
+  scheduled_at?: Date;
   updated_at: Date;
 }
 
@@ -13,6 +14,7 @@ const DraftSchema = new Schema<IDraft>({
   content: { type: String, required: true },
   receiver_address: { type: String },
   stamp_id: { type: String },
+  scheduled_at: { type: Date },
   updated_at: { type: Date, default: Date.now },
 });
 

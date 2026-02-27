@@ -4,6 +4,8 @@ import { SendLetterSchema } from '@/lib/validation';
 import { ZodError } from 'zod';
 import { MOCK_STAMPS } from '@/lib/mocks';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
