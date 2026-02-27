@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   description: 'A slow-letter ritual web application.',
 };
 
+import { Providers } from '@/components/Providers';
+
 export default function RootLayout({
   children,
 }: {
@@ -34,7 +36,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cinzel.variable} ${ebGaramond.variable} ${pinyonScript.variable}`}>
       <body className="bg-feathers-bg text-feathers-text min-h-screen antialiased selection:bg-feathers-accent selection:text-feathers-bg overflow-x-hidden">
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

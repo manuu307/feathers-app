@@ -7,12 +7,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateUserSchema, CreateUserInput, BirdTypeEnum } from '@/lib/validation';
 
+import { useLanguage } from '@/lib/i18n';
+
 interface ProfileViewProps {
   user: any;
   onUpdate: (updatedUser: any) => void;
 }
 
 export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
+  const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -63,17 +66,17 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
         <UserIcon className="w-6 h-6 text-celtic-parchment" />
       </div>
 
-      <h2 className="text-3xl font-display text-celtic-wood-dark text-center mb-2 mt-4 uppercase tracking-widest">Character Sheet</h2>
-      <p className="text-center text-celtic-wood-light font-serif italic mb-8">Your identity in the realm</p>
+      <h2 className="text-3xl font-display text-celtic-wood-dark text-center mb-2 mt-4 uppercase tracking-widest">{t.profile.title}</h2>
+      <p className="text-center text-celtic-wood-light font-serif italic mb-8">{t.profile.subtitle}</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Identity Section */}
           <div className="space-y-4">
-            <h3 className="text-xs uppercase tracking-[0.2em] text-celtic-wood-light border-b border-celtic-wood-light/20 pb-2 mb-4">Identity</h3>
+            <h3 className="text-xs uppercase tracking-[0.2em] text-celtic-wood-light border-b border-celtic-wood-light/20 pb-2 mb-4">{t.profile.identity}</h3>
             
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">Full Name</label>
+              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">{t.profile.fullName}</label>
               <input
                 {...register('full_name')}
                 disabled={!isEditing}
@@ -83,7 +86,7 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">Birth Date</label>
+              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">{t.profile.birthDate}</label>
               <input
                 type="date"
                 {...register('birth_date')}
@@ -93,21 +96,21 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">Realm Address</label>
+              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">{t.profile.realmAddress}</label>
               <div className="flex items-center text-celtic-wood-dark/50 font-serif text-lg py-2 border-b border-transparent">
                 <span className="mr-1">@</span>
                 {user.addresses[0].address}
               </div>
-              <p className="text-[10px] text-celtic-wood-light italic">Address cannot be changed.</p>
+              <p className="text-[10px] text-celtic-wood-light italic">{t.profile.addressNote}</p>
             </div>
           </div>
 
           {/* Companion Section */}
           <div className="space-y-4">
-            <h3 className="text-xs uppercase tracking-[0.2em] text-celtic-wood-light border-b border-celtic-wood-light/20 pb-2 mb-4">Companion</h3>
+            <h3 className="text-xs uppercase tracking-[0.2em] text-celtic-wood-light border-b border-celtic-wood-light/20 pb-2 mb-4">{t.profile.companion}</h3>
             
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">Bird Name</label>
+              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">{t.profile.birdName}</label>
               <input
                 {...register('bird_name')}
                 disabled={!isEditing}
@@ -116,7 +119,7 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">Bird Type</label>
+              <label className="block text-[10px] uppercase tracking-widest text-celtic-wood-main mb-1">{t.profile.birdType}</label>
               <select
                 {...register('bird_type')}
                 disabled={!isEditing}
@@ -124,7 +127,7 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
               >
                 {BirdTypeEnum.options.map((type) => (
                   <option key={type} value={type}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                    {t.birds[type as keyof typeof t.birds] || type}
                   </option>
                 ))}
               </select>
@@ -139,7 +142,7 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
               onClick={() => setIsEditing(true)}
               className="px-8 py-3 bg-celtic-wood-dark text-celtic-parchment font-display tracking-widest uppercase text-xs hover:bg-celtic-wood-main transition-colors shadow-md"
             >
-              Edit Profile
+              {t.profile.edit}
             </button>
           ) : (
             <div className="flex space-x-4">
@@ -148,16 +151,16 @@ export default function ProfileView({ user, onUpdate }: ProfileViewProps) {
                 onClick={() => setIsEditing(false)}
                 className="px-6 py-3 border border-celtic-wood-dark text-celtic-wood-dark font-display tracking-widest uppercase text-xs hover:bg-celtic-wood-dark/5 transition-colors"
               >
-                Cancel
+                {t.profile.cancel}
               </button>
               <button
                 type="submit"
                 disabled={isLoading}
                 className="px-8 py-3 bg-celtic-green text-white font-display tracking-widest uppercase text-xs hover:bg-celtic-green/90 transition-colors shadow-md flex items-center"
               >
-                {isLoading ? 'Saving...' : (
+                {isLoading ? t.profile.saving : (
                   <>
-                    Save Changes <Save className="w-4 h-4 ml-2" />
+                    {t.profile.save} <Save className="w-4 h-4 ml-2" />
                   </>
                 )}
               </button>

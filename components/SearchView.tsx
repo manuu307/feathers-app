@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Search, User, MapPin } from 'lucide-react';
 
+import { useLanguage } from '@/lib/i18n';
+
 interface SearchViewProps {
   onSelectUser: (user: any) => void;
 }
 
 export default function SearchView({ onSelectUser }: SearchViewProps) {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,15 +44,15 @@ export default function SearchView({ onSelectUser }: SearchViewProps) {
         <Search className="w-6 h-6 text-celtic-parchment" />
       </div>
 
-      <h2 className="text-3xl font-display text-celtic-wood-dark text-center mb-2 mt-4 uppercase tracking-widest">Seek Others</h2>
-      <p className="text-center text-celtic-wood-light font-serif italic mb-8">Find fellow travelers across the realm</p>
+      <h2 className="text-3xl font-display text-celtic-wood-dark text-center mb-2 mt-4 uppercase tracking-widest">{t.search.title}</h2>
+      <p className="text-center text-celtic-wood-light font-serif italic mb-8">{t.search.subtitle}</p>
 
       <form onSubmit={handleSearch} className="relative mb-12">
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by name or address..."
+          placeholder={t.search.placeholder}
           className="w-full bg-transparent border-b-2 border-celtic-wood-light/30 py-4 pl-4 pr-12 text-celtic-wood-dark font-serif text-xl focus:border-celtic-gold focus:outline-none placeholder:text-celtic-wood-light/40"
         />
         <button 
@@ -64,7 +67,7 @@ export default function SearchView({ onSelectUser }: SearchViewProps) {
         {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin w-8 h-8 border-2 border-celtic-gold border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-celtic-wood-light font-serif italic">Scouring the archives...</p>
+            <p className="text-celtic-wood-light font-serif italic">{t.search.searching}</p>
           </div>
         ) : results.length > 0 ? (
           results.map((user) => (
@@ -88,17 +91,17 @@ export default function SearchView({ onSelectUser }: SearchViewProps) {
                 </div>
               </div>
               <button className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 bg-celtic-wood-dark text-celtic-parchment text-[10px] uppercase tracking-widest font-display rounded-sm shadow-sm hover:bg-celtic-gold">
-                Write
+                {t.search.write}
               </button>
             </motion.div>
           ))
         ) : searchTerm && !isLoading ? (
           <div className="text-center py-12 text-celtic-wood-light/60 font-serif italic">
-            No souls found matching your query.
+            {t.search.noResults}
           </div>
         ) : (
           <div className="text-center py-12 text-celtic-wood-light/40 font-serif italic">
-            Enter a name to begin your search.
+            {t.search.initial}
           </div>
         )}
       </div>

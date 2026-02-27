@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, Mail } from 'lucide-react';
+import { Send, X, Mail, ChevronLeft, ChevronRight, Tag, Save, Trash2, Filter } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SendLetterSchema, SendLetterInput } from '@/lib/validation';
@@ -14,6 +14,7 @@ import Navigation from '@/components/Navigation';
 import BackgroundManager from '@/components/BackgroundManager';
 import ProfileView from '@/components/ProfileView';
 import SearchView from '@/components/SearchView';
+import { useLanguage } from '@/lib/i18n';
 
 interface DeskProps {
   user: any;
@@ -21,13 +22,26 @@ interface DeskProps {
 }
 
 export default function Desk({ user: initialUser, onLogout }: DeskProps) {
+  const { t } = useLanguage();
   const [user, setUser] = useState(initialUser);
   const [view, setView] = useState('list'); // list, writing, reading, search, profile
   const [letters, setLetters] = useState<any[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [writingPages, setWritingPages] = useState<string[]>(['']);
+  const [currentWritingPage, setCurrentWritingPage] = useState(0);
+  const CHARS_PER_PAGE = 600;
+  const PAGE_DELIMITER = '\f';
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [birdState, setBirdState] = useState<'idle' | 'flying' | 'landing'>('idle');
+
+  // Tagging & Saving State
+  const [mailboxTab, setMailboxTab] = useState<'inbox' | 'saved'>('inbox');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [readingTags, setReadingTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState('');
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
 
   const {
     register,
@@ -48,7 +62,8 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const fetchLetters = useCallback(async () => {
     try {
       const address = user.addresses[0].address;
-      const response = await fetch(`/api/letters/${address}`);
+      const typeParam = mailboxTab === 'saved' ? '?type=saved' : '';
+      const response = await fetch(`/api/letters/${address}${typeParam}`);
       if (response.ok) {
         const data = await response.json();
         setLetters(data);
@@ -56,13 +71,39 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
     } catch (error) {
       console.error('Failed to fetch letters', error);
     }
-  }, [user]);
+  }, [user, mailboxTab]);
 
   useEffect(() => {
     fetchLetters();
     const interval = setInterval(fetchLetters, 30000); // Poll every 30s
     return () => clearInterval(interval);
   }, [fetchLetters]);
+
+  const handleCloseLetter = async (action: 'save' | 'drop') => {
+    if (!selectedLetter) return;
+
+    try {
+      const response = await fetch('/api/letters/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedLetter._id,
+          status: action === 'save' ? 'saved' : 'dropped',
+          tags: readingTags
+        }),
+      });
+
+      if (response.ok) {
+        setSelectedLetter(null);
+        setShowCloseConfirmation(false);
+        setReadingTags([]);
+        setView('list');
+        fetchLetters(); // Refresh list
+      }
+    } catch (error) {
+      console.error('Failed to update letter status', error);
+    }
+  };
 
   const onSend = async (data: SendLetterInput) => {
     setIsSending(true);
@@ -83,7 +124,9 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
       // Success animation/state
       setView('list');
       reset();
-      alert(`Your bird ${user.bird.name} has taken flight.`);
+      setWritingPages(['']);
+      setCurrentWritingPage(0);
+      alert(t.writing.success.replace('{name}', user.bird.name));
     } catch (err: any) {
       setSendError(err.message);
     } finally {
@@ -97,6 +140,9 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   };
 
   const handleSelectUser = (selectedUser: any) => {
+    setWritingPages(['']);
+    setCurrentWritingPage(0);
+    reset();
     setValue('receiver_address', selectedUser.address);
     setView('writing');
   };
@@ -110,6 +156,11 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
         onViewChange={(v) => {
           setView(v);
           if (v !== 'reading') setSelectedLetter(null);
+          if (v === 'writing') {
+            setWritingPages(['']);
+            setCurrentWritingPage(0);
+            reset();
+          }
         }}
         onRefresh={fetchLetters}
         onLogout={onLogout}
@@ -127,68 +178,132 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
               exit={{ opacity: 0, y: -20 }}
               className="w-full max-w-2xl space-y-8"
             >
-              <div className="text-center mb-12">
-                <h2 className="text-4xl font-display text-white drop-shadow-md tracking-widest uppercase italic">The Mailbox</h2>
+              <div className="text-center mb-8">
+                <h2 className="text-4xl font-display text-white drop-shadow-md tracking-widest uppercase italic">{t.mailbox.title}</h2>
                 <div className="h-0.5 w-32 bg-white/50 mx-auto mt-4" />
               </div>
 
-              {letters.length === 0 ? (
-                <div className="parchment-card p-12 text-center rounded-sm">
-                  <p className="text-celtic-wood-light font-serif italic text-xl">The winds have brought no news today.</p>
-                  <button 
-                    onClick={() => setView('writing')}
-                    className="mt-6 text-celtic-gold hover:text-celtic-wood-dark underline font-display text-sm uppercase tracking-widest"
+              {/* Tabs */}
+              <div className="flex justify-center space-x-8 mb-8">
+                <button
+                  onClick={() => { setMailboxTab('inbox'); setSelectedTag(null); }}
+                  className={`text-lg font-display tracking-widest uppercase transition-colors ${mailboxTab === 'inbox' ? 'text-celtic-gold border-b-2 border-celtic-gold' : 'text-white/60 hover:text-white'}`}
+                >
+                  {t.mailbox.inbox}
+                </button>
+                <button
+                  onClick={() => { setMailboxTab('saved'); setSelectedTag(null); }}
+                  className={`text-lg font-display tracking-widest uppercase transition-colors ${mailboxTab === 'saved' ? 'text-celtic-gold border-b-2 border-celtic-gold' : 'text-white/60 hover:text-white'}`}
+                >
+                  {t.mailbox.saved}
+                </button>
+              </div>
+
+              {/* Tag Filters (Only in Saved) */}
+              {mailboxTab === 'saved' && letters.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2 mb-8">
+                  <button
+                    onClick={() => setSelectedTag(null)}
+                    className={`px-3 py-1 rounded-full text-xs font-display tracking-wider uppercase transition-colors ${!selectedTag ? 'bg-celtic-gold text-celtic-wood-dark' : 'bg-white/10 text-white hover:bg-white/20'}`}
                   >
-                    Send a bird
+                    {t.mailbox.all}
                   </button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {letters.map((letter) => (
-                    <motion.div
-                      key={letter._id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      onClick={() => {
-                        setSelectedLetter(letter);
-                        setView('reading');
-                      }}
-                      className="relative parchment-card p-6 rounded-sm cursor-pointer hover:-translate-y-1 transition-transform group overflow-hidden"
+                  {Array.from(new Set(letters.flatMap(l => l.tags || []))).map((tag: any) => (
+                    <button
+                      key={tag}
+                      onClick={() => setSelectedTag(tag)}
+                      className={`px-3 py-1 rounded-full text-xs font-display tracking-wider uppercase transition-colors ${selectedTag === tag ? 'bg-celtic-gold text-celtic-wood-dark' : 'bg-white/10 text-white hover:bg-white/20'}`}
                     >
-                      {/* Envelope Flap Effect */}
-                      <div className="absolute top-0 left-0 w-full h-3 bg-celtic-wood-dark/5 group-hover:bg-celtic-wood-dark/10 transition-colors" />
-                      
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 rounded-full bg-celtic-wood-dark/10 flex items-center justify-center">
-                            <Mail className="w-5 h-5 text-celtic-wood-dark" />
-                          </div>
-                          <div>
-                            <span className="block text-celtic-wood-dark font-display text-sm tracking-wider uppercase">From the Beyond</span>
-                            <span className="text-celtic-wood-light text-xs font-serif italic">
-                              {new Date(letter.available_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {letter.stamp && (
-                          <div className="transform rotate-3 group-hover:rotate-6 transition-transform">
-                            <Stamp 
-                              icon={letter.stamp.icon} 
-                              color={letter.stamp.color} 
-                              size="sm" 
-                            />
-                          </div>
-                        )}
-                      </div>
-                      
-                      <p className="text-celtic-wood-main text-lg font-serif italic line-clamp-2 border-l-2 border-celtic-gold/30 pl-4">
-                        &quot;A sealed scroll awaits your eyes...&quot;
-                      </p>
-                    </motion.div>
+                      #{tag}
+                    </button>
                   ))}
                 </div>
               )}
+
+              {(() => {
+                const displayedLetters = selectedTag 
+                  ? letters.filter(l => l.tags?.includes(selectedTag))
+                  : letters;
+
+                if (displayedLetters.length === 0) {
+                  return (
+                    <div className="parchment-card p-12 text-center rounded-sm">
+                      <p className="text-celtic-wood-light font-serif italic text-xl">
+                        {mailboxTab === 'saved' ? t.mailbox.noSaved : t.mailbox.empty}
+                      </p>
+                      {mailboxTab === 'inbox' && (
+                        <button 
+                          onClick={() => setView('writing')}
+                          className="mt-6 text-celtic-gold hover:text-celtic-wood-dark underline font-display text-sm uppercase tracking-widest"
+                        >
+                          {t.mailbox.sendBird}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {displayedLetters.map((letter) => (
+                      <motion.div
+                        key={letter._id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onClick={() => {
+                          setSelectedLetter(letter);
+                          setCurrentPage(0);
+                          setReadingTags(letter.tags || []);
+                          setView('reading');
+                        }}
+                        className="relative parchment-card p-6 rounded-sm cursor-pointer hover:-translate-y-1 transition-transform group overflow-hidden"
+                      >
+                        {/* Envelope Flap Effect */}
+                        <div className="absolute top-0 left-0 w-full h-3 bg-celtic-wood-dark/5 group-hover:bg-celtic-wood-dark/10 transition-colors" />
+                        
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 rounded-full bg-celtic-wood-dark/10 flex items-center justify-center">
+                              <Mail className="w-5 h-5 text-celtic-wood-dark" />
+                            </div>
+                            <div>
+                              <span className="block text-celtic-wood-dark font-display text-sm tracking-wider uppercase">{t.mailbox.fromBeyond}</span>
+                              <span className="text-celtic-wood-light text-xs font-serif italic">
+                                {new Date(letter.available_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {letter.stamp && (
+                            <div className="transform rotate-3 group-hover:rotate-6 transition-transform">
+                              <Stamp 
+                                icon={letter.stamp.icon} 
+                                color={letter.stamp.color} 
+                                size="sm" 
+                              />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <p className="text-celtic-wood-main text-lg font-serif italic line-clamp-2 border-l-2 border-celtic-gold/30 pl-4">
+                          &quot;{t.mailbox.sealedScroll}&quot;
+                        </p>
+
+                        {/* Tags in Card */}
+                        {letter.tags && letter.tags.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {letter.tags.map((tag: string) => (
+                              <span key={tag} className="text-[10px] uppercase tracking-wider text-celtic-wood-light bg-celtic-wood-dark/5 px-2 py-0.5 rounded-full">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                );
+              })()}
             </motion.div>
           )}
 
@@ -199,7 +314,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-4xl parchment-card p-8 md:p-16 rounded-sm relative shadow-2xl"
+              className="w-full max-w-4xl parchment-card p-8 md:p-16 rounded-sm relative shadow-2xl flex flex-col min-h-[700px]"
             >
               <button 
                 onClick={() => setView('list')}
@@ -208,13 +323,19 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                 <X className="w-8 h-8" />
               </button>
 
-              <h2 className="text-4xl font-display text-celtic-wood-dark mb-12 text-center tracking-widest uppercase">Compose Scroll</h2>
+              <h2 className="text-4xl font-display text-celtic-wood-dark mb-12 text-center tracking-widest uppercase">{t.writing.title}</h2>
 
-              <form onSubmit={handleSubmit(onSend)} className="space-y-10">
-                <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-                  <div className="flex-1 w-full">
+              <form 
+                onSubmit={handleSubmit((data) => {
+                  const fullContent = writingPages.join(PAGE_DELIMITER);
+                  onSend({ ...data, content: fullContent });
+                })} 
+                className="space-y-10 flex-grow flex flex-col"
+              >
+                <div className="flex flex-col md:flex-row justify-between items-start gap-8 flex-grow">
+                  <div className="flex-1 w-full flex flex-col">
                     <div className="relative mb-10">
-                      <label className="block text-xs uppercase tracking-[0.2em] text-celtic-wood-light mb-3 font-display">Recipient Address</label>
+                      <label className="block text-xs uppercase tracking-[0.2em] text-celtic-wood-light mb-3 font-display">{t.writing.recipient}</label>
                       <input
                         {...register('receiver_address')}
                         className="w-full bg-transparent border-b-2 border-celtic-wood-light/30 py-3 text-celtic-wood-dark font-serif text-2xl focus:border-celtic-gold focus:outline-none transition-colors placeholder:text-celtic-wood-light/30"
@@ -223,20 +344,82 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                       {errors.receiver_address && <p className="text-red-700 text-xs mt-2 font-serif">{errors.receiver_address.message}</p>}
                     </div>
 
-                    <div className="relative">
+                    <div className="relative flex-grow flex flex-col">
                       <textarea
-                        {...register('content')}
-                        rows={10}
-                        className="w-full bg-transparent border-none resize-none text-celtic-wood-dark font-serif text-xl leading-relaxed focus:ring-0 p-0 placeholder:text-celtic-wood-light/30 italic"
-                        placeholder="My dearest friend, the sun rises over the valley..."
+                        value={writingPages[currentWritingPage]}
+                        onChange={(e) => {
+                          const newPages = [...writingPages];
+                          newPages[currentWritingPage] = e.target.value;
+                          setWritingPages(newPages);
+                          // Sync with form for validation (though we use joined content on submit)
+                          setValue('content', newPages.join(PAGE_DELIMITER));
+                        }}
+                        rows={12}
+                        className="w-full bg-transparent border-none resize-none text-celtic-wood-dark font-serif text-xl leading-relaxed focus:ring-0 p-0 placeholder:text-celtic-wood-light/30 italic flex-grow"
+                        placeholder={t.writing.placeholder}
                       />
                       {errors.content && <p className="text-red-700 text-xs mt-2 font-serif">{errors.content.message}</p>}
+                    </div>
+
+                    {/* Writing Pagination Controls */}
+                    <div className="mt-6 flex items-center justify-between border-t border-celtic-wood-light/10 pt-6">
+                      <div className="flex items-center space-x-4">
+                        <button
+                          type="button"
+                          disabled={currentWritingPage === 0}
+                          onClick={() => setCurrentWritingPage(prev => prev - 1)}
+                          className="p-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        
+                        <span className="font-serif italic text-celtic-wood-light text-sm">
+                          {t.writing.page} {currentWritingPage + 1} / {writingPages.length}
+                        </span>
+
+                        <button
+                          type="button"
+                          disabled={currentWritingPage === writingPages.length - 1}
+                          onClick={() => setCurrentWritingPage(prev => prev + 1)}
+                          className="p-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {writingPages.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newPages = writingPages.filter((_, i) => i !== currentWritingPage);
+                              setWritingPages(newPages);
+                              setCurrentWritingPage(Math.max(0, currentWritingPage - 1));
+                            }}
+                            className="text-[10px] uppercase tracking-widest font-display text-red-700/60 hover:text-red-700 transition-colors"
+                          >
+                            {t.writing.removePage}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPages = [...writingPages];
+                            newPages.splice(currentWritingPage + 1, 0, '');
+                            setWritingPages(newPages);
+                            setCurrentWritingPage(currentWritingPage + 1);
+                          }}
+                          className="px-4 py-2 border border-celtic-gold/30 text-celtic-gold hover:bg-celtic-gold/5 transition-colors text-[10px] uppercase tracking-widest font-display rounded-sm"
+                        >
+                          {t.writing.addPage}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   {/* Stamp Selection */}
                   <div className="w-full md:w-48 flex flex-col items-center space-y-6 p-6 bg-white/30 rounded-sm border border-celtic-wood-light/10">
-                    <label className="text-[10px] uppercase tracking-[0.2em] text-celtic-wood-light font-display">Select Seal</label>
+                    <label className="text-[10px] uppercase tracking-[0.2em] text-celtic-wood-light font-display">{t.writing.selectSeal}</label>
                     <div className="grid grid-cols-2 md:grid-cols-1 gap-4">
                       {MOCK_STAMPS.filter(s => user.stamps?.includes(s.id)).map((stamp) => (
                         <button
@@ -250,7 +433,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                       ))}
                       {(!user.stamps || user.stamps.length === 0) && (
                         <div className="col-span-2 md:col-span-1 h-20 border-2 border-dashed border-celtic-wood-light/20 rounded-sm flex items-center justify-center">
-                          <span className="text-[10px] text-celtic-wood-light/40 text-center px-2">No stamps available</span>
+                          <span className="text-[10px] text-celtic-wood-light/40 text-center px-2">{t.writing.noStamps}</span>
                         </div>
                       )}
                     </div>
@@ -267,9 +450,9 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                     disabled={isSending}
                     className="px-12 py-4 bg-celtic-wood-dark text-celtic-parchment font-display tracking-[0.3em] uppercase text-xs hover:bg-celtic-wood-main transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center"
                   >
-                    {isSending ? 'The bird prepares...' : (
+                    {isSending ? t.writing.preparing : (
                       <>
-                        Dispatch {user.bird.name} <Send className="w-4 h-4 ml-3" />
+                        {t.writing.dispatch} {user.bird.name} <Send className="w-4 h-4 ml-3" />
                       </>
                     )}
                   </button>
@@ -279,51 +462,183 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
           )}
 
           {/* READING VIEW */}
-          {view === 'reading' && selectedLetter && (
-            <motion.div
-              key="reading"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-3xl parchment-card p-8 md:p-16 rounded-sm relative shadow-2xl"
-            >
-               <button 
-                onClick={() => {
-                  setSelectedLetter(null);
-                  setView('list');
-                }}
-                className="absolute top-6 right-6 text-celtic-wood-light hover:text-celtic-wood-dark transition-colors"
-              >
-                <X className="w-8 h-8" />
-              </button>
+          {view === 'reading' && selectedLetter && (() => {
+            const content = selectedLetter.content || '';
+            let pages = [];
+            
+            if (content.includes(PAGE_DELIMITER)) {
+              pages = content.split(PAGE_DELIMITER);
+            } else {
+              for (let i = 0; i < content.length; i += CHARS_PER_PAGE) {
+                pages.push(content.substring(i, i + CHARS_PER_PAGE));
+              }
+            }
+            
+            const totalPages = Math.max(1, pages.length);
+            const currentPageContent = pages[currentPage] || '';
 
-              <div className="mb-12 text-center border-b border-celtic-wood-light/20 pb-8 relative">
-                <p className="font-display text-xs text-celtic-wood-light uppercase tracking-[0.3em] mb-3">Scroll Received</p>
-                <p className="font-serif text-2xl italic text-celtic-wood-dark">{new Date(selectedLetter.available_at).toLocaleDateString()}</p>
-                
-                {selectedLetter.stamp && (
-                  <div className="absolute top-0 right-0 transform rotate-12 drop-shadow-md">
-                    <Stamp 
-                      icon={selectedLetter.stamp.icon} 
-                      color={selectedLetter.stamp.color} 
-                      size="lg" 
-                    />
+            return (
+              <motion.div
+                key="reading"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-3xl parchment-card p-8 md:p-16 rounded-sm relative shadow-2xl flex flex-col min-h-[600px]"
+              >
+                <button 
+                  onClick={() => setShowCloseConfirmation(true)}
+                  className="absolute top-6 right-6 text-celtic-wood-light hover:text-celtic-wood-dark transition-colors z-10"
+                >
+                  <X className="w-8 h-8" />
+                </button>
+
+                <div className="mb-12 text-center border-b border-celtic-wood-light/20 pb-8 relative">
+                  <p className="font-display text-xs text-celtic-wood-light uppercase tracking-[0.3em] mb-3">{t.reading.received}</p>
+                  <p className="font-serif text-2xl italic text-celtic-wood-dark">{new Date(selectedLetter.available_at).toLocaleDateString()}</p>
+                  
+                  {selectedLetter.stamp && (
+                    <div className="absolute top-0 right-0 transform rotate-12 drop-shadow-md">
+                      <Stamp 
+                        icon={selectedLetter.stamp.icon} 
+                        color={selectedLetter.stamp.color} 
+                        size="lg" 
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-grow prose prose-p:font-serif prose-headings:font-display prose-p:text-celtic-wood-dark prose-headings:text-celtic-wood-dark max-w-none">
+                  <p className="text-xl leading-loose italic whitespace-pre-wrap">
+                    {currentPageContent}
+                  </p>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-8 flex items-center justify-between border-t border-celtic-wood-light/10 pt-6">
+                    <button
+                      disabled={currentPage === 0}
+                      onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                      className="flex items-center space-x-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors uppercase font-display text-[10px] tracking-widest"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>{t.reading.prev}</span>
+                    </button>
+                    
+                    <span className="font-serif italic text-celtic-wood-light text-sm">
+                      {t.reading.page} {currentPage + 1} / {totalPages}
+                    </span>
+
+                    <button
+                      disabled={currentPage === totalPages - 1}
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                      className="flex items-center space-x-2 text-celtic-wood-light hover:text-celtic-gold disabled:opacity-20 transition-colors uppercase font-display text-[10px] tracking-widest"
+                    >
+                      <span>{t.reading.next}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
-              </div>
 
-              <div className="prose prose-p:font-serif prose-headings:font-display prose-p:text-celtic-wood-dark prose-headings:text-celtic-wood-dark max-w-none">
-                <p className="text-xl leading-loose italic whitespace-pre-wrap">
-                  {selectedLetter.content}
-                </p>
-              </div>
+                {/* Tagging Section */}
+                <div className="mt-12 pt-8 border-t border-celtic-wood-light/20">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Tag className="w-4 h-4 text-celtic-wood-light" />
+                    <span className="text-xs font-display uppercase tracking-widest text-celtic-wood-light">{t.reading.tags}</span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {readingTags.map(tag => (
+                      <span key={tag} className="bg-celtic-wood-dark/5 text-celtic-wood-dark px-3 py-1 rounded-full text-xs font-display tracking-wider flex items-center gap-2">
+                        #{tag}
+                        <button 
+                          onClick={() => setReadingTags(prev => prev.filter(t => t !== tag))}
+                          className="hover:text-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
 
-              <div className="mt-16 pt-10 border-t border-celtic-wood-light/20 text-center">
-                <p className="font-script text-4xl text-celtic-wood-dark/60">With regards,</p>
-                <p className="font-display text-xs text-celtic-wood-light mt-4 tracking-widest uppercase">A Traveler of the Realm</p>
-              </div>
-            </motion.div>
-          )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newTag.trim() && !readingTags.includes(newTag.trim())) {
+                            setReadingTags([...readingTags, newTag.trim()]);
+                            setNewTag('');
+                          }
+                        }
+                      }}
+                      placeholder={t.reading.addTag}
+                      className="bg-transparent border-b border-celtic-wood-light/30 py-1 text-sm font-serif focus:border-celtic-gold focus:outline-none placeholder:italic placeholder:text-celtic-wood-light/40"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newTag.trim() && !readingTags.includes(newTag.trim())) {
+                          setReadingTags([...readingTags, newTag.trim()]);
+                          setNewTag('');
+                        }
+                      }}
+                      className="text-celtic-gold hover:text-celtic-wood-dark"
+                    >
+                      <span className="text-xs uppercase font-display tracking-widest">+</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-celtic-wood-light/20 text-center">
+                  <p className="font-script text-4xl text-celtic-wood-dark/60">{t.reading.regards}</p>
+                  <p className="font-display text-xs text-celtic-wood-light mt-4 tracking-widest uppercase">{t.reading.traveler}</p>
+                </div>
+
+                {/* Close Confirmation Modal */}
+                <AnimatePresence>
+                  {showCloseConfirmation && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-sm"
+                    >
+                      <div className="text-center p-8 max-w-sm">
+                        <h3 className="font-display text-xl text-celtic-wood-dark mb-4 uppercase tracking-widest">{t.reading.saveOrDrop}</h3>
+                        <p className="font-serif italic text-celtic-wood-light mb-8">{t.reading.saveOrDropDesc}</p>
+                        
+                        <div className="flex justify-center gap-4">
+                          <button
+                            onClick={() => handleCloseLetter('drop')}
+                            className="flex items-center gap-2 px-6 py-3 border border-red-200 text-red-700 hover:bg-red-50 transition-colors font-display text-xs uppercase tracking-widest rounded-sm"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            {t.reading.drop}
+                          </button>
+                          <button
+                            onClick={() => handleCloseLetter('save')}
+                            className="flex items-center gap-2 px-6 py-3 bg-celtic-wood-dark text-celtic-parchment hover:bg-celtic-wood-main transition-colors font-display text-xs uppercase tracking-widest rounded-sm shadow-lg"
+                          >
+                            <Save className="w-4 h-4" />
+                            {t.reading.save}
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => setShowCloseConfirmation(false)}
+                          className="mt-6 text-xs text-celtic-wood-light underline hover:text-celtic-wood-dark"
+                        >
+                          {t.profile.cancel}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })()}
 
           {/* PROFILE VIEW */}
           {view === 'profile' && (

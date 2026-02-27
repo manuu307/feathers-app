@@ -60,11 +60,29 @@ export class LetterService {
     await dbConnect();
     const now = new Date();
     
-    // Return letters that have "arrived" (available_at <= now)
+    // Return letters that have "arrived" (available_at <= now) and are not processed (saved/dropped)
     return await Letter.find({
       receiver_address: address,
       available_at: { $lte: now },
+      status: { $in: ['sending', 'received'] }
     }).sort({ available_at: -1 });
+  }
+
+  static async getSavedLetters(address: string): Promise<ILetter[]> {
+    await dbConnect();
+    return await Letter.find({
+      receiver_address: address,
+      status: 'saved'
+    }).sort({ available_at: -1 });
+  }
+
+  static async updateStatus(id: string, status: 'saved' | 'dropped', tags: string[] = []): Promise<ILetter | null> {
+    await dbConnect();
+    return await Letter.findByIdAndUpdate(
+      id,
+      { status, tags },
+      { new: true }
+    );
   }
 
   static async getPendingLetters(address: string): Promise<ILetter[]> {

@@ -1,7 +1,9 @@
 'use client';
 
-import { Feather, PenTool, Search, RefreshCw, User, LogOut } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Feather, PenTool, Search, RefreshCw, User, LogOut, Globe } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useLanguage, Language } from '@/lib/i18n';
+import { useState } from 'react';
 
 interface NavigationProps {
   currentView: string;
@@ -11,11 +13,20 @@ interface NavigationProps {
 }
 
 export default function Navigation({ currentView, onViewChange, onRefresh, onLogout }: NavigationProps) {
+  const { t, language, setLanguage } = useLanguage();
+  const [showLangMenu, setShowLangMenu] = useState(false);
+
   const navItems = [
-    { id: 'list', icon: Feather, label: 'Home' },
-    { id: 'writing', icon: PenTool, label: 'Write' },
-    { id: 'search', icon: Search, label: 'Seek' },
-    { id: 'profile', icon: User, label: 'Profile' },
+    { id: 'list', icon: Feather, label: t.nav.home },
+    { id: 'writing', icon: PenTool, label: t.nav.write },
+    { id: 'search', icon: Search, label: t.nav.seek },
+    { id: 'profile', icon: User, label: t.nav.profile },
+  ];
+
+  const languages: { code: Language; label: string }[] = [
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+    { code: 'pt', label: 'Português' },
   ];
 
   return (
@@ -50,10 +61,45 @@ export default function Navigation({ currentView, onViewChange, onRefresh, onLog
         </div>
 
         <div className="flex items-center space-x-4">
+          {/* Language Selector */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowLangMenu(!showLangMenu)}
+              className="p-2 rounded-full hover:bg-white/5 text-celtic-parchment/60 hover:text-celtic-gold transition-colors flex items-center space-x-1"
+              title="Change Language"
+            >
+              <Globe className="w-5 h-5" />
+              <span className="text-[10px] uppercase font-serif">{language}</span>
+            </button>
+            <AnimatePresence>
+              {showLangMenu && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full right-0 mt-2 parchment-card p-2 rounded-sm shadow-xl min-w-[120px] z-[60]"
+                >
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => {
+                        setLanguage(lang.code);
+                        setShowLangMenu(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-xs uppercase tracking-widest font-serif hover:bg-celtic-wood-dark/5 rounded-sm ${language === lang.code ? 'text-celtic-gold font-bold' : 'text-celtic-wood-dark'}`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <button 
             onClick={onRefresh}
             className="p-2 rounded-full hover:bg-white/5 text-celtic-parchment/60 hover:text-celtic-gold transition-colors"
-            title="Refresh Letters"
+            title={t.nav.refresh}
           >
             <RefreshCw className="w-5 h-5" />
           </button>
@@ -63,7 +109,7 @@ export default function Navigation({ currentView, onViewChange, onRefresh, onLog
             className="flex items-center space-x-2 text-celtic-parchment/60 hover:text-red-400 transition-colors"
           >
             <LogOut className="w-5 h-5" />
-            <span className="text-xs uppercase tracking-widest font-serif hidden lg:inline">Leave</span>
+            <span className="text-xs uppercase tracking-widest font-serif hidden lg:inline">{t.nav.leave}</span>
           </button>
         </div>
       </motion.nav>
@@ -84,12 +130,25 @@ export default function Navigation({ currentView, onViewChange, onRefresh, onLog
             <span className="text-[9px] uppercase tracking-widest font-serif">{item.label}</span>
           </button>
         ))}
+        
+        {/* Mobile Language Toggle (Cycles) */}
+        <button
+          onClick={() => {
+            const nextLang = language === 'en' ? 'es' : language === 'es' ? 'pt' : 'en';
+            setLanguage(nextLang);
+          }}
+          className="flex flex-col items-center p-2 text-celtic-parchment/60"
+        >
+          <Globe className="w-6 h-6 mb-1" />
+          <span className="text-[9px] uppercase tracking-widest font-serif">{language}</span>
+        </button>
+
         <button
           onClick={onLogout}
           className="flex flex-col items-center p-2 text-celtic-parchment/60 hover:text-red-400"
         >
           <LogOut className="w-6 h-6 mb-1" />
-          <span className="text-[9px] uppercase tracking-widest font-serif">Leave</span>
+          <span className="text-[9px] uppercase tracking-widest font-serif">{t.nav.leave}</span>
         </button>
       </motion.nav>
     </>

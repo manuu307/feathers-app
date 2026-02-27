@@ -4,12 +4,13 @@ export interface ILetter extends Document {
   sender_id: mongoose.Types.ObjectId;
   receiver_address: string;
   content: string;
-  status: 'sending' | 'received';
+  status: 'sending' | 'received' | 'saved' | 'dropped';
   sent_at: Date;
   available_at: Date;
   received_at?: Date;
   images: string[];
   stamp_id?: string;
+  tags: string[];
 }
 
 const LetterSchema = new Schema<ILetter>({
@@ -18,7 +19,7 @@ const LetterSchema = new Schema<ILetter>({
   content: { type: String, required: true },
   status: { 
     type: String, 
-    enum: ['sending', 'received'], 
+    enum: ['sending', 'received', 'saved', 'dropped'], 
     default: 'sending',
     required: true 
   },
@@ -30,6 +31,7 @@ const LetterSchema = new Schema<ILetter>({
     validate: [arrayLimit, '{PATH} exceeds the limit of 3'] 
   },
   stamp_id: { type: String },
+  tags: { type: [String], default: [] },
 });
 
 function arrayLimit(val: string[]) {

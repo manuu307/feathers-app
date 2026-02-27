@@ -11,8 +11,8 @@ export const MOCK_USER = {
   birth_date: '1985-05-12',
   addresses: [{ address: 'elder-thorne', label: 'Primary' }],
   bird: {
-    name: 'Hugin',
-    type: 'raven',
+    name: 'Archimedes',
+    type: 'owl',
   },
   stamps: ['stamp-forest', 'stamp-sky'],
   created_at: new Date().toISOString(),

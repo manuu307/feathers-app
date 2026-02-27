@@ -12,14 +12,31 @@ export async function GET(
     // Check for demo/mock mode
     if (!process.env.MONGODB_URI || address === 'elder-thorne') {
       console.log('Using mock letters (DB missing or demo address)');
-      return NextResponse.json(MOCK_LETTERS, { status: 200 });
+      const { searchParams } = new URL(req.url);
+      const type = searchParams.get('type');
+      
+      let filteredMocks = MOCK_LETTERS;
+      if (type === 'saved') {
+        filteredMocks = MOCK_LETTERS.filter((l: any) => l.status === 'saved');
+      } else {
+        filteredMocks = MOCK_LETTERS.filter((l: any) => !l.status || l.status === 'received' || l.status === 'sending');
+      }
+      return NextResponse.json(filteredMocks, { status: 200 });
     }
     
     if (!address) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
-    const letters = await LetterService.getIncomingLetters(address);
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get('type');
+
+    let letters;
+    if (type === 'saved') {
+      letters = await LetterService.getSavedLetters(address);
+    } else {
+      letters = await LetterService.getIncomingLetters(address);
+    }
     
     return NextResponse.json(letters, { status: 200 });
   } catch (error) {
