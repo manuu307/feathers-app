@@ -49,15 +49,31 @@ export class LetterService {
       }
     }
 
-    // 5. Deduct Stamp from Inventory
-    if (data.stamp_id) {
-      const stampIndex = sender.stamps.findIndex(s => s.stamp_id === data.stamp_id);
+    // 5. Deduct Stamps from Inventory
+    const stampsToUse = data.stamps || (data.stamp_id ? [data.stamp_id] : []);
+    
+    for (const stampId of stampsToUse) {
+      const stampIndex = sender.stamps.findIndex(s => s.stamp_id === stampId);
       if (stampIndex === -1 || sender.stamps[stampIndex].quantity <= 0) {
-        throw new Error('You do not have any of this stamp in your inventory.');
+        throw new Error(`You do not have enough of stamp ${stampId} in your inventory.`);
       }
       sender.stamps[stampIndex].quantity -= 1;
-      await sender.save();
     }
+    
+    // Validate Envelope Ownership
+    if (data.envelope_id) {
+      // Check if it's a default envelope or owned
+      const Envelope = (await import('@/models/Envelope')).default;
+      const envelope = await Envelope.findById(data.envelope_id);
+      
+      if (envelope && !envelope.is_default) {
+        if (!sender.envelopes.includes(data.envelope_id)) {
+           throw new Error('You do not own this envelope.');
+        }
+      }
+    }
+
+    await sender.save();
 
     // 6. Create Letter
     const newLetter = new Letter({
@@ -68,7 +84,8 @@ export class LetterService {
       sent_at: new Date(),
       available_at: availableAt,
       images: data.images || [],
-      stamp_id: data.stamp_id,
+      stamps: stampsToUse,
+      envelope_id: data.envelope_id,
       scheduled_at: data.scheduled_at ? new Date(data.scheduled_at) : undefined,
     });
 

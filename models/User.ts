@@ -22,6 +22,7 @@ export interface IUser extends Document {
     stamp_id: string;
     quantity: number;
   }[];
+  envelopes: string[]; // Array of envelope IDs (unlockable)
   created_at: Date;
 }
 
@@ -51,6 +52,7 @@ const UserSchema = new Schema<IUser>({
     stamp_id: { type: String, required: true },
     quantity: { type: Number, default: 1 }
   }],
+  envelopes: { type: [String], default: [] },
   created_at: { type: Date, default: Date.now },
 });
 

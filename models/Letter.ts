@@ -9,7 +9,9 @@ export interface ILetter extends Document {
   available_at: Date;
   received_at?: Date;
   images: string[];
-  stamp_id?: string;
+  stamp_id?: string; // Deprecated, use stamps array
+  stamps: string[]; // Array of stamp IDs (max 3)
+  envelope_id: string;
   tags: string[];
   scheduled_at?: Date;
 }
@@ -32,6 +34,12 @@ const LetterSchema = new Schema<ILetter>({
     validate: [arrayLimit, '{PATH} exceeds the limit of 3'] 
   },
   stamp_id: { type: String },
+  stamps: { 
+    type: [String], 
+    validate: [arrayLimit, '{PATH} exceeds the limit of 3'],
+    default: []
+  },
+  envelope_id: { type: String, required: true, default: 'default-envelope' },
   tags: { type: [String], default: [] },
   scheduled_at: { type: Date },
 });

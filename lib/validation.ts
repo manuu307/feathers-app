@@ -15,7 +15,9 @@ export const SendLetterSchema = z.object({
   receiver_address: z.string().min(3),
   content: z.string().min(50, "Letter must be at least 50 characters long").max(5000, "Letter cannot exceed 5000 characters"),
   images: z.array(z.string().url()).max(3, "Maximum 3 images allowed").optional(),
-  stamp_id: z.string().optional(),
+  stamp_id: z.string().optional(), // Deprecated
+  stamps: z.array(z.string()).max(3, "Maximum 3 stamps allowed").optional(),
+  envelope_id: z.string().optional(),
   scheduled_at: z.string().optional().refine((date) => !date || new Date(date).toString() !== 'Invalid Date', { message: "Valid date is required" }),
 });
 

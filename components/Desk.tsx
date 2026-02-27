@@ -18,6 +18,7 @@ import NotesManager from '@/components/NotesManager';
 import DraftsManager from '@/components/DraftsManager';
 import LetterSkeleton from '@/components/LetterSkeleton';
 import StampMarket from '@/components/StampMarket';
+import Envelope from '@/components/Envelope';
 import { useLanguage } from '@/lib/i18n';
 import { useSound } from '@/lib/sounds';
 import { Eraser } from 'lucide-react';
@@ -35,21 +36,28 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const [letters, setLetters] = useState<any[]>([]);
   const [isLettersLoading, setIsLettersLoading] = useState(true);
   const [allStamps, setAllStamps] = useState<any[]>([]);
+  const [allEnvelopes, setAllEnvelopes] = useState<any[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
 
   useEffect(() => {
-    const fetchAllStamps = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/stamps');
-        if (response.ok) {
-          const data = await response.json();
-          setAllStamps(data);
+        const [stampsRes, envelopesRes] = await Promise.all([
+          fetch('/api/stamps'),
+          fetch('/api/envelopes')
+        ]);
+        
+        if (stampsRes.ok) {
+          setAllStamps(await stampsRes.json());
+        }
+        if (envelopesRes.ok) {
+          setAllEnvelopes(await envelopesRes.json());
         }
       } catch (error) {
-        console.error('Failed to fetch stamps', error);
+        console.error('Failed to fetch assets', error);
       }
     };
-    fetchAllStamps();
+    fetchData();
   }, []);
   const [currentPage, setCurrentPage] = useState(0);
   const [writingPages, setWritingPages] = useState<string[]>(['']);
@@ -408,72 +416,51 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
 
                 return (
                   <div className="space-y-6">
-                    {displayedLetters.map((letter) => (
-                      <motion.div
-                        key={letter._id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onClick={() => {
-                          playSound('paper');
-                          setSelectedLetter(letter);
-                          setCurrentPage(0);
-                          setReadingTags(letter.tags || []);
-                          setView('reading');
-                        }}
-                        className="relative parchment-card p-6 rounded-sm cursor-pointer hover:-translate-y-1 transition-transform group overflow-hidden"
-                      >
-                        {/* Envelope Flap Effect */}
-                        <div className="absolute top-0 left-0 w-full h-3 bg-celtic-wood-dark/5 group-hover:bg-celtic-wood-dark/10 transition-colors" />
-                        
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-celtic-wood-dark/10 flex items-center justify-center">
-                              <Mail className="w-5 h-5 text-celtic-wood-dark" />
-                            </div>
-                            <div>
-                              <span className="block text-celtic-wood-dark font-display text-sm tracking-wider uppercase">
-                                {mailboxTab === 'sent' 
-                                  ? t.mailbox.toRecipient.replace('{address}', letter.receiver_address) 
-                                  : t.mailbox.fromBeyond
-                                }
-                              </span>
-                              <span className="text-celtic-wood-light text-xs font-serif italic">
-                                {mounted ? new Date(mailboxTab === 'sent' ? letter.sent_at : letter.available_at).toLocaleDateString() : '...'}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {(() => {
-                            const stamp = allStamps.find(s => (s._id || s.id) === letter.stamp_id);
-                            if (!stamp) return null;
-                            return (
-                              <div className="transform rotate-3 group-hover:rotate-6 transition-transform">
-                                <Stamp 
-                                  icon={stamp.icon} 
-                                  color={stamp.color} 
-                                  size="sm" 
-                                />
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        
-                        <p className="text-celtic-wood-main text-lg font-serif italic line-clamp-2 border-l-2 border-celtic-gold/30 pl-4">
-                          &quot;{t.mailbox.sealedScroll}&quot;
-                        </p>
+                    {displayedLetters.map((letter) => {
+                      const envelope = allEnvelopes.find(e => (e._id || e.id) === letter.envelope_id) || 
+                        allEnvelopes.find(e => e.is_default) || 
+                        { layout: 'classic', css_class: 'bg-[#f0e6d2] border border-[#d7c9a8]' };
+                      
+                      const letterStamps = (letter.stamps || [letter.stamp_id]).map((sid: string) => 
+                        allStamps.find(s => (s._id || s.id) === sid)
+                      ).filter(Boolean);
 
-                        {/* Tags in Card */}
-                        {letter.tags && letter.tags.length > 0 && (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {letter.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] uppercase tracking-wider text-celtic-wood-light bg-celtic-wood-dark/5 px-2 py-0.5 rounded-full">
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
+                      return (
+                        <motion.div
+                          key={letter._id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          onClick={() => {
+                            playSound('paper');
+                            setSelectedLetter(letter);
+                            setCurrentPage(0);
+                            setReadingTags(letter.tags || []);
+                            setView('reading');
+                          }}
+                          className="cursor-pointer hover:-translate-y-1 transition-transform"
+                        >
+                          <Envelope
+                            layout={envelope.layout}
+                            cssClass={envelope.css_class}
+                            senderAddress={letter.sender_id?.addresses?.[0]?.address || 'Unknown'}
+                            receiverAddress={letter.receiver_address}
+                            stamps={letterStamps}
+                            size="sm"
+                          />
+                          
+                          {/* Tags in Card */}
+                          {letter.tags && letter.tags.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2 justify-center">
+                              {letter.tags.map((tag: string) => (
+                                <span key={tag} className="text-[10px] uppercase tracking-wider text-celtic-wood-light bg-celtic-wood-dark/5 px-2 py-0.5 rounded-full">
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -634,38 +621,89 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                     </div>
                   </div>
 
-                  {/* Stamp Selection */}
-                  <div className="w-full md:w-48 flex flex-col items-center space-y-6 p-6 bg-white/30 rounded-sm border border-celtic-wood-light/10">
-                    <label className="text-[10px] uppercase tracking-[0.2em] text-celtic-wood-light font-display">{t.writing.selectSeal}</label>
-                    <div className="grid grid-cols-2 md:grid-cols-1 gap-4">
-                      {user.stamps?.filter((s: any) => s.quantity > 0).map((inventoryItem: any) => {
-                        const stamp = allStamps.find(s => (s._id || s.id) === inventoryItem.stamp_id);
-                        if (!stamp) return null;
-                        
-                        const stampId = stamp._id || stamp.id;
-
-                        return (
+                  {/* Envelope and Stamp Selection */}
+                  <div className="w-full md:w-64 flex flex-col space-y-6 p-6 bg-white/30 rounded-sm border border-celtic-wood-light/10">
+                    
+                    {/* Envelope Selection */}
+                    <div>
+                      <label className="text-[10px] uppercase tracking-[0.2em] text-celtic-wood-light font-display block mb-4">{t.writing.selectEnvelope || 'Select Envelope'}</label>
+                      <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                        {allEnvelopes.filter(e => e.is_default || user.envelopes?.includes(e._id || e.id)).map((env) => (
                           <button
-                            key={stampId}
+                            key={env._id || env.id}
                             type="button"
-                            onClick={() => {
-                              playSound('stamp');
-                              setValue('stamp_id', currentStampId === stampId ? undefined : stampId);
-                            }}
-                            className={`p-2 rounded-sm transition-all flex flex-col items-center justify-center relative ${currentStampId === stampId ? 'bg-celtic-gold/20 ring-2 ring-celtic-gold' : 'hover:bg-celtic-wood-dark/5'}`}
+                            onClick={() => setValue('envelope_id', env._id || env.id)}
+                            className={`p-2 rounded-sm text-left text-xs font-display uppercase tracking-wider transition-all ${watch('envelope_id') === (env._id || env.id) ? 'bg-celtic-wood-dark text-celtic-parchment' : 'hover:bg-celtic-wood-dark/5 text-celtic-wood-dark'}`}
                           >
-                            <Stamp icon={stamp.icon} color={stamp.color} size="md" />
-                            <span className="text-[8px] mt-1 text-celtic-wood-light font-display">x{inventoryItem.quantity}</span>
+                            {env.name}
                           </button>
-                        );
-                      })}
-                      {(!user.stamps || user.stamps.filter((s: any) => s.quantity > 0).length === 0) && (
-                        <div className="col-span-2 md:col-span-1 h-20 border-2 border-dashed border-celtic-wood-light/20 rounded-sm flex items-center justify-center">
-                          <span className="text-[10px] text-celtic-wood-light/40 text-center px-2">{t.writing.noStamps}</span>
-                        </div>
-                      )}
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Stamp Selection */}
+                    <div>
+                      <label className="text-[10px] uppercase tracking-[0.2em] text-celtic-wood-light font-display block mb-4">{t.writing.selectSeal}</label>
+                      <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                        {user.stamps?.filter((s: any) => s.quantity > 0).map((inventoryItem: any) => {
+                          const stamp = allStamps.find(s => (s._id || s.id) === inventoryItem.stamp_id);
+                          if (!stamp) return null;
+                          
+                          const stampId = stamp._id || stamp.id;
+                          const currentStamps = watch('stamps') || [];
+                          const isSelected = currentStamps.includes(stampId);
+
+                          return (
+                            <button
+                              key={stampId}
+                              type="button"
+                              onClick={() => {
+                                playSound('stamp');
+                                const current = watch('stamps') || [];
+                                if (current.includes(stampId)) {
+                                  setValue('stamps', current.filter((id: string) => id !== stampId));
+                                } else if (current.length < 3) {
+                                  setValue('stamps', [...current, stampId]);
+                                }
+                              }}
+                              className={`p-2 rounded-sm transition-all flex flex-col items-center justify-center relative ${isSelected ? 'bg-celtic-gold/20 ring-2 ring-celtic-gold' : 'hover:bg-celtic-wood-dark/5'}`}
+                            >
+                              <Stamp icon={stamp.icon} color={stamp.color} size="md" />
+                              <span className="text-[8px] mt-1 text-celtic-wood-light font-display">x{inventoryItem.quantity}</span>
+                              {isSelected && <div className="absolute top-1 right-1 w-2 h-2 bg-celtic-gold rounded-full" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-celtic-wood-light italic mt-2 text-center">
+                        {(watch('stamps') || []).length}/3 selected
+                      </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Envelope Preview */}
+                <div className="mt-8 flex justify-center">
+                  {(() => {
+                    const envId = watch('envelope_id');
+                    const envelope = allEnvelopes.find(e => (e._id || e.id) === envId) || allEnvelopes[0];
+                    const selectedStamps = (watch('stamps') || []).map((sid: string) => allStamps.find(s => (s._id || s.id) === sid)).filter(Boolean);
+                    
+                    if (!envelope) return null;
+
+                    return (
+                      <div className="transform scale-75 md:scale-100 origin-top">
+                        <Envelope
+                          layout={envelope.layout}
+                          cssClass={envelope.css_class}
+                          senderAddress={user.addresses[0].address}
+                          receiverAddress={watch('receiver_address') || 'Recipient'}
+                          stamps={selectedStamps}
+                          size="md"
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {sendError && (
