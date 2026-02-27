@@ -41,7 +41,7 @@ export default function StampMarket({ user, onUpdateUser }: StampMarketProps) {
   const handleBuy = async (stamp: any) => {
     if (user.gold < stamp.price) {
       setMessage({ type: 'error', text: 'Not enough gold!' });
-      playSound('error');
+      playSound('click');
       return;
     }
 
@@ -80,11 +80,11 @@ export default function StampMarket({ user, onUpdateUser }: StampMarketProps) {
         onUpdateUser(updatedUser);
       } else {
         setMessage({ type: 'error', text: result.error || 'Purchase failed' });
-        playSound('error');
+        playSound('click');
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Network error' });
-      playSound('error');
+      playSound('click');
     } finally {
       setIsBuying(null);
     }

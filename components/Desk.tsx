@@ -437,7 +437,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                             setReadingTags(letter.tags || []);
                             setView('reading');
                           }}
-                          className="cursor-pointer hover:-translate-y-1 transition-transform"
+                          className="cursor-pointer hover:-translate-y-1 transition-transform flex flex-col items-center"
                         >
                           <Envelope
                             layout={envelope.layout}
@@ -445,7 +445,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                             senderAddress={letter.sender_id?.addresses?.[0]?.address || 'Unknown'}
                             receiverAddress={letter.receiver_address}
                             stamps={letterStamps}
-                            size="sm"
+                            size="md"
                           />
                           
                           {/* Tags in Card */}
