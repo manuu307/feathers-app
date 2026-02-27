@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, Mail, ChevronLeft, ChevronRight, Tag, Save, Trash2, Filter } from 'lucide-react';
+import { Send, X, Mail, ChevronLeft, ChevronRight, Tag, Save, Trash2, Filter, StickyNote } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SendLetterSchema, SendLetterInput } from '@/lib/validation';
@@ -14,7 +14,10 @@ import Navigation from '@/components/Navigation';
 import BackgroundManager from '@/components/BackgroundManager';
 import ProfileView from '@/components/ProfileView';
 import SearchView from '@/components/SearchView';
+import NotesManager from '@/components/NotesManager';
+import DraftsManager from '@/components/DraftsManager';
 import { useLanguage } from '@/lib/i18n';
+import { Eraser } from 'lucide-react';
 
 interface DeskProps {
   user: any;
@@ -24,7 +27,7 @@ interface DeskProps {
 export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const { t } = useLanguage();
   const [user, setUser] = useState(initialUser);
-  const [view, setView] = useState('list'); // list, writing, reading, search, profile
+  const [view, setView] = useState('list'); // list, writing, reading, search, profile, notes
   const [letters, setLetters] = useState<any[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -42,6 +45,13 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
   const [readingTags, setReadingTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+
+  // Notes State
+  const [showNotesSidebar, setShowNotesSidebar] = useState(false);
+
+  // Drafts State
+  const [showDraftsSidebar, setShowDraftsSidebar] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
 
   const {
     register,
@@ -105,6 +115,81 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
     }
   };
 
+  const saveDraft = async () => {
+    const fullContent = writingPages.join(PAGE_DELIMITER);
+    if (!fullContent.trim()) return;
+
+    try {
+      const url = currentDraftId ? `/api/drafts/${currentDraftId}` : '/api/drafts';
+      const method = currentDraftId ? 'PUT' : 'POST';
+      const body: any = {
+        content: fullContent,
+        receiver_address: watch('receiver_address'),
+        stamp_id: watch('stamp_id'),
+      };
+      
+      if (!currentDraftId) {
+        body.sender_id = user._id;
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        const draft = await response.json();
+        setCurrentDraftId(draft._id);
+      }
+    } catch (error) {
+      console.error('Failed to save draft', error);
+    }
+  };
+
+  // Auto-save draft when leaving writing view
+  useEffect(() => {
+    return () => {
+      if (view === 'writing') {
+        // We can't use async in cleanup, but we can fire and forget or use sendBeacon if needed.
+        // However, since state might be stale in cleanup, we handle it in onViewChange
+      }
+    };
+  }, [view]);
+
+  const handleViewChange = async (newView: string) => {
+    if (view === 'writing') {
+      await saveDraft();
+      // Reset writing state if leaving writing view
+      if (newView !== 'writing') {
+         // Don't reset immediately if we want to keep state? 
+         // Actually user requested "when he abandon that position".
+         // So we save and then clear.
+         setWritingPages(['']);
+         setCurrentWritingPage(0);
+         setCurrentDraftId(null);
+         reset();
+      }
+    }
+    setView(newView);
+    if (newView !== 'reading') setSelectedLetter(null);
+    if (newView === 'writing') {
+      // Reset handled above or when entering?
+      // If entering writing view fresh, we want empty state.
+      // If we clicked "Write" from nav, we want empty state.
+      // If we clicked a draft, we handle that separately.
+    }
+  };
+
+  const handleSelectDraft = (draft: any) => {
+    setWritingPages(draft.content.split(PAGE_DELIMITER));
+    setValue('receiver_address', draft.receiver_address || '');
+    setValue('stamp_id', draft.stamp_id);
+    setCurrentDraftId(draft._id);
+    setShowDraftsSidebar(false);
+    setView('writing');
+  };
+
   const onSend = async (data: SendLetterInput) => {
     setIsSending(true);
     setSendError(null);
@@ -119,6 +204,12 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to send letter');
+      }
+
+      // Delete draft if it exists
+      if (currentDraftId) {
+        await fetch(`/api/drafts/${currentDraftId}`, { method: 'DELETE' });
+        setCurrentDraftId(null);
       }
 
       // Success animation/state
@@ -153,15 +244,7 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
       
       <Navigation 
         currentView={view} 
-        onViewChange={(v) => {
-          setView(v);
-          if (v !== 'reading') setSelectedLetter(null);
-          if (v === 'writing') {
-            setWritingPages(['']);
-            setCurrentWritingPage(0);
-            reset();
-          }
-        }}
+        onViewChange={handleViewChange}
         onRefresh={fetchLetters}
         onLogout={onLogout}
       />
@@ -323,6 +406,28 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                 <X className="w-8 h-8" />
               </button>
 
+              <div className="absolute top-6 left-6 flex items-center gap-6 md:gap-8">
+                {/* Notes Toggle */}
+                <button 
+                  onClick={() => setShowNotesSidebar(!showNotesSidebar)}
+                  className={`transition-colors flex items-center gap-2 ${showNotesSidebar ? 'text-celtic-gold' : 'text-celtic-wood-light hover:text-celtic-wood-dark'}`}
+                  title={t.notes.title}
+                >
+                  <StickyNote className="w-6 h-6" />
+                  <span className="text-[10px] uppercase tracking-widest font-display hidden md:inline">{t.notes.title}</span>
+                </button>
+
+                {/* Drafts Toggle */}
+                <button 
+                  onClick={() => setShowDraftsSidebar(!showDraftsSidebar)}
+                  className={`transition-colors flex items-center gap-2 ${showDraftsSidebar ? 'text-celtic-gold' : 'text-celtic-wood-light hover:text-celtic-wood-dark'}`}
+                  title={t.drafts.title}
+                >
+                  <Eraser className="w-6 h-6" />
+                  <span className="text-[10px] uppercase tracking-widest font-display hidden md:inline">{t.drafts.title}</span>
+                </button>
+              </div>
+
               <h2 className="text-4xl font-display text-celtic-wood-dark mb-12 text-center tracking-widest uppercase">{t.writing.title}</h2>
 
               <form 
@@ -392,6 +497,12 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
                           <button
                             type="button"
                             onClick={() => {
+                              const currentPageContent = writingPages[currentWritingPage];
+                              if (currentPageContent.trim().length > 0) {
+                                if (!window.confirm(t.writing.confirmRemovePage)) {
+                                  return;
+                                }
+                              }
                               const newPages = writingPages.filter((_, i) => i !== currentWritingPage);
                               setWritingPages(newPages);
                               setCurrentWritingPage(Math.max(0, currentWritingPage - 1));
@@ -650,8 +761,59 @@ export default function Desk({ user: initialUser, onLogout }: DeskProps) {
             <SearchView onSelectUser={handleSelectUser} />
           )}
 
+          {/* NOTES VIEW */}
+          {view === 'notes' && (
+            <motion.div
+              key="notes"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-4xl h-[80vh]"
+            >
+              <NotesManager userId={user._id} mode="full" />
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </main>
+
+      {/* NOTES SIDEBAR (For Writing) */}
+      <AnimatePresence>
+        {showNotesSidebar && (
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 h-full w-80 md:w-96 z-50 shadow-2xl"
+          >
+            <NotesManager 
+              userId={user._id} 
+              mode="sidebar" 
+              onClose={() => setShowNotesSidebar(false)} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* DRAFTS SIDEBAR (For Writing) */}
+      <AnimatePresence>
+        {showDraftsSidebar && (
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 left-0 h-full w-80 md:w-96 z-50 shadow-2xl"
+          >
+            <DraftsManager 
+              userId={user._id} 
+              onSelectDraft={handleSelectDraft}
+              onClose={() => setShowDraftsSidebar(false)} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

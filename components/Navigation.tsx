@@ -1,6 +1,6 @@
 'use client';
 
-import { Feather, PenTool, Search, RefreshCw, User, LogOut, Globe } from 'lucide-react';
+import { Feather, PenTool, Search, RefreshCw, User, LogOut, Globe, StickyNote } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage, Language } from '@/lib/i18n';
 import { useState } from 'react';
@@ -20,6 +20,7 @@ export default function Navigation({ currentView, onViewChange, onRefresh, onLog
     { id: 'list', icon: Feather, label: t.nav.home },
     { id: 'writing', icon: PenTool, label: t.nav.write },
     { id: 'search', icon: Search, label: t.nav.seek },
+    { id: 'notes', icon: StickyNote, label: t.nav.notes },
     { id: 'profile', icon: User, label: t.nav.profile },
   ];
 
