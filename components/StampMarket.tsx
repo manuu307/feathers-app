@@ -126,7 +126,7 @@ export default function StampMarket({ user, onUpdateUser }: StampMarketProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {stamps.map((stamp) => {
           const stampId = stamp._id || stamp.id;
-          const owned = user.stamps.find((s: any) => s.stamp_id === stampId);
+          const owned = user.stamps?.find((s: any) => s.stamp_id === stampId);
           const isProcessing = isBuying === stampId;
 
           return (
